@@ -39,9 +39,10 @@ class Player(CharacterBody3D):
     overclock_scale = 0.3
     slow_fov = 14.0  # degrees the view widens in bullet time, so the camera seems to step back from her
     shake_frequency = 24.0   # Hz of the trauma shake
-    shake_amplitude_x = 0.06  # metres at full trauma
-    shake_amplitude_y = 0.04
-    shake_roll = 2.0          # degrees at full trauma
+    shake_amplitude_x = 0.09  # metres at full trauma
+    shake_amplitude_y = 0.06
+    shake_roll = 2.5          # degrees at full trauma
+    shot_trauma = 0.45        # a shot: shake is the trauma squared, so this is a short 2 cm kick
     _slow_blend = 0.0
     slow_pitch = 0.5
     dodge_speed = 8.5
@@ -904,7 +905,7 @@ class Player(CharacterBody3D):
             self._game.noise(self.global_position, 14.0)
         self._kick = 1.0
         if self._game != None:
-            self._game.add_trauma(0.12)
+            self._game.add_trauma(self.shot_trauma)
         if self._muzzle != None:
             self._muzzle.fire()
         self._shots = self._shots + 1
