@@ -4045,6 +4045,16 @@ int PhysicsServer3D::ragdollGetPartBone(PhysicsRagdollId ragdoll, PhysicsRagdoll
     return record->ragdoll->boneIndex(static_cast<kp::RagdollPart>(part));
 }
 
+PhysicsRagdollPart PhysicsServer3D::ragdollGetPartParent(PhysicsRagdollId ragdoll,
+        PhysicsRagdollPart part) const
+{
+    const PhysicsRagdollTag* record = mImpl->ragdolls.get(ragdoll);
+    if (!record || record->dying || part >= PhysicsRagdollPart::Count)
+        return PhysicsRagdollPart::Count;
+    return static_cast<PhysicsRagdollPart>(
+            record->ragdoll->parentOf(static_cast<kp::RagdollPart>(part)));
+}
+
 float PhysicsServer3D::ragdollGetPartMass(PhysicsRagdollId ragdoll, PhysicsRagdollPart part) const
 {
     const PhysicsRagdollTag* record = mImpl->ragdolls.get(ragdoll);

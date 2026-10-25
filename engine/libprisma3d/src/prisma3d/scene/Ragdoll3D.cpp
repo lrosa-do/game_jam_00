@@ -447,6 +447,12 @@ int Ragdoll3D::getPartBone(PhysicsRagdollPart part) const
     return server ? server->ragdollGetPartBone(mRagdoll, part) : -1;
 }
 
+PhysicsRagdollPart Ragdoll3D::getPartParent(PhysicsRagdollPart part) const
+{
+    PhysicsServer3D* server = PhysicsServer3D::singleton();
+    return server ? server->ragdollGetPartParent(mRagdoll, part) : PhysicsRagdollPart::Count;
+}
+
 float Ragdoll3D::getPartMass(PhysicsRagdollPart part) const
 {
     PhysicsServer3D* server = PhysicsServer3D::singleton();

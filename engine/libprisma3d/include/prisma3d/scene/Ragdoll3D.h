@@ -75,6 +75,7 @@ public:
     float getHeadSize() const;
     float getFacing() const;
     int getPartBone(PhysicsRagdollPart part) const;
+    PhysicsRagdollPart getPartParent(PhysicsRagdollPart part) const;
     float getPartMass(PhysicsRagdollPart part) const;
     void applyImpulse(PhysicsRagdollPart part, const Math::Vec3& impulse,
             const Math::Vec3& offset = Math::Vec3(0.0f, 0.0f, 0.0f));

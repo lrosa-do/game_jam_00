@@ -2204,7 +2204,7 @@ Methods:
 
 #### Dismember3D
 
-Inherits `Node3D`. Pulls a `Ragdoll3D` apart: each loose part flies on its own with no joint to its parent part. Each time a part comes loose, the skinned meshes of the ragdoll's skeleton are swapped for a cut copy of the original: every part that is still attached stays with the nearest loose part above it (or with the body), each triangle goes to the group whose bones weigh most on it and keeps its blend weights inside that group, and vertices on a seam between groups are duplicated, so only the real cuts open and the joints of the body still bend smoothly; the cuts are left open. The original meshes come back when the node leaves the tree. Stopping the ragdoll joins the parts again.
+Inherits `Node3D`. Pulls a `Ragdoll3D` apart: each loose part flies on its own with no joint to its parent part. Each time a part comes loose, the skinned meshes of the ragdoll's skeleton are swapped for a cut copy of the original: every part that is still attached stays with the part it hangs from in the physics ragdoll (the head and the arms hang from the spine), each triangle goes to the group of the bone segment nearest to it in the bind pose, so the cut falls on a plane through each joint whatever the skin weights are, and keeps its blend weights inside that group (a vertex left without weights is bound to the nearest bone of its group), and vertices on a seam between groups are duplicated, so only the real cuts open and the joints of the body still bend smoothly; the cuts are left open. The original meshes come back when the node leaves the tree. Stopping the ragdoll joins the parts again.
 
 | Property | Type | Range / values | Default |
 |---|---|---|---|

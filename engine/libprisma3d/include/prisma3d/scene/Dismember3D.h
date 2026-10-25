@@ -11,6 +11,8 @@
 namespace prisma3d
 {
 
+struct DismemberSegment;
+
 class Dismember3D : public Node3D
 {
 public:
@@ -52,7 +54,8 @@ private:
     void cutMeshes(const bool* separated);
     void restoreMeshes();
     void destroyCuts();
-    MeshId cutMesh(MeshId source, const ct::Vector<int>& partOfBone, const int* partBones) const;
+    MeshId cutMesh(MeshId source, const ct::Vector<int>& partOfBone, const int* partBones,
+            const ct::Vector<DismemberSegment>& segments) const;
 
     Ragdoll3D* mRagdoll;
     ct::Vector<Cut> mCuts;

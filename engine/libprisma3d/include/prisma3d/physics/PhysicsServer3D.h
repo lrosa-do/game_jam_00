@@ -683,6 +683,8 @@ public:
             std::size_t boneCount, const Math::Mat4& ownerWorld, float alpha) const;
     void ragdollSetCollisionMask(PhysicsRagdollId ragdoll, std::uint32_t mask);
     int ragdollGetPartBone(PhysicsRagdollId ragdoll, PhysicsRagdollPart part) const;
+    PhysicsRagdollPart ragdollGetPartParent(PhysicsRagdollId ragdoll,
+            PhysicsRagdollPart part) const;
     float ragdollGetPartMass(PhysicsRagdollId ragdoll, PhysicsRagdollPart part) const;
     float ragdollGetFacing(PhysicsRagdollId ragdoll) const;
     Math::Mat4 ragdollGetPartTransform(PhysicsRagdollId ragdoll, PhysicsRagdollPart part) const;

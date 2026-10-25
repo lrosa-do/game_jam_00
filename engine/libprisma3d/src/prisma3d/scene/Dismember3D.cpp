@@ -9,6 +9,14 @@
 namespace prisma3d
 {
 
+struct DismemberSegment
+{
+    Math::Vec3 from;
+    Math::Vec3 to;
+    int bone = 0;
+    int group = 0;
+};
+
 namespace
 {
 
@@ -21,6 +29,16 @@ void collectSkinned(Node* node, const Skeleton3D* skeleton, ct::Vector<MeshInsta
         out.push_back(instance);
     for (std::size_t i = 0; i < node->getChildCount(); ++i)
         collectSkinned(node->getChild(i), skeleton, out);
+}
+
+float segmentDistance2(const Math::Vec3& point, const Math::Vec3& a, const Math::Vec3& b)
+{
+    const Math::Vec3 ab = b - a;
+    const float length2 = ab.Dot(ab);
+    float t = length2 > 1e-12f ? (point - a).Dot(ab) / length2 : 0.0f;
+    t = t < 0.0f ? 0.0f : t > 1.0f ? 1.0f : t;
+    const Math::Vec3 d = point - (a + ab * t);
+    return d.Dot(d);
 }
 
 int dominantPart(const SurfaceData& in, const std::uint32_t* corners,
@@ -45,8 +63,30 @@ int dominantPart(const SurfaceData& in, const std::uint32_t* corners,
     return best;
 }
 
+int nearestBoneOf(const Math::Vec3& point, int part, const ct::Vector<int>& groupOfBone,
+        const ct::Vector<DismemberSegment>& segments, int fallback)
+{
+    float best = 3.4e38f;
+    int bone = fallback;
+    for (std::size_t k = 0; k < segments.size(); ++k)
+    {
+        const int owner = segments[k].bone;
+        if (owner >= static_cast<int>(groupOfBone.size()) ||
+                groupOfBone[static_cast<std::size_t>(owner)] != part)
+            continue;
+        const float d = segmentDistance2(point, segments[k].from, segments[k].to);
+        if (d < best)
+        {
+            best = d;
+            bone = owner;
+        }
+    }
+    return bone;
+}
+
 void copyVertex(const SurfaceData& in, std::uint32_t vertex, int part,
-        const ct::Vector<int>& partOfBone, int partBone, SurfaceData& out)
+        const ct::Vector<int>& partOfBone, int partBone,
+        const ct::Vector<DismemberSegment>& segments, SurfaceData& out)
 {
     out.positions.push_back(in.positions[vertex]);
     if (!in.normals.empty()) out.normals.push_back(in.normals[vertex]);
@@ -77,7 +117,10 @@ void copyVertex(const SurfaceData& in, std::uint32_t vertex, int part,
     }
     else if (partBone >= 0)
     {
-        out.joints.push_back(static_cast<std::uint32_t>(partBone));
+        const int bone = segments.empty() ? partBone
+                                          : nearestBoneOf(in.positions[vertex], part, partOfBone,
+                                                    segments, partBone);
+        out.joints.push_back(static_cast<std::uint32_t>(bone));
         out.weights.push_back(Math::Vec4(1.0f, 0.0f, 0.0f, 0.0f));
     }
     else
@@ -226,8 +269,8 @@ bool Dismember3D::isMeshCut() const
     return mMeshCut;
 }
 
-MeshId Dismember3D::cutMesh(MeshId source, const ct::Vector<int>& partOfBone,
-        const int* partBones) const
+MeshId Dismember3D::cutMesh(MeshId source, const ct::Vector<int>& partOfBone, const int* partBones,
+        const ct::Vector<DismemberSegment>& segments) const
 {
     MeshStore* store = MeshStore::singleton();
     const MeshInfo* info = store ? store->get(source) : nullptr;
@@ -258,7 +301,24 @@ MeshId Dismember3D::cutMesh(MeshId source, const ct::Vector<int>& partOfBone,
             for (int c = 0; c < 3; ++c)
                 corners[c] = in.indices.empty() ? static_cast<std::uint32_t>(t + c)
                                                 : in.indices[t + static_cast<std::size_t>(c)];
-            const int part = dominantPart(in, corners, partOfBone);
+            int part = 0;
+            if (segments.empty()) part = dominantPart(in, corners, partOfBone);
+            else
+            {
+                const Math::Vec3 centre = (in.positions[corners[0]] + in.positions[corners[1]] +
+                                                  in.positions[corners[2]]) *
+                                          (1.0f / 3.0f);
+                float best = 3.4e38f;
+                for (std::size_t k = 0; k < segments.size(); ++k)
+                {
+                    const float d = segmentDistance2(centre, segments[k].from, segments[k].to);
+                    if (d < best)
+                    {
+                        best = d;
+                        part = segments[k].group;
+                    }
+                }
+            }
             for (int c = 0; c < 3; ++c)
             {
                 const std::uint64_t key = (static_cast<std::uint64_t>(corners[c]) << 8) |
@@ -270,7 +330,7 @@ MeshId Dismember3D::cutMesh(MeshId source, const ct::Vector<int>& partOfBone,
                     continue;
                 }
                 const std::uint32_t index = static_cast<std::uint32_t>(out.positions.size());
-                copyVertex(in, corners[c], part, partOfBone, partBones[part], out);
+                copyVertex(in, corners[c], part, partOfBone, partBones[part], segments, out);
                 remap[key] = index;
                 out.indices.push_back(index);
             }
@@ -310,12 +370,15 @@ void Dismember3D::cutMeshes(const bool* separated)
         partOfBone[static_cast<std::size_t>(bone)] = part;
     }
 
+    // The parts hang from each other as the physics ragdoll joins them (the arms from the spine,
+    // as the head does), which is not always the hierarchy of the skeleton (a Bip01 holds the
+    // clavicles under the neck).
     int parentPart[kParts];
     for (std::size_t p = 0; p < kParts; ++p)
     {
-        const int parentBone = partBones[p] >= 0 ? skeleton->getBoneParent(partBones[p]) : -1;
-        parentPart[p] =
-                p == 0 || parentBone < 0 ? 0 : partOfBone[static_cast<std::size_t>(parentBone)];
+        const std::size_t parent = static_cast<std::size_t>(
+                mRagdoll->getPartParent(static_cast<PhysicsRagdollPart>(p)));
+        parentPart[p] = p == 0 || parent >= kParts ? 0 : static_cast<int>(parent);
     }
     int group[kParts];
     for (std::size_t p = 0; p < kParts; ++p)
@@ -328,7 +391,89 @@ void Dismember3D::cutMeshes(const bool* separated)
     ct::Vector<int> groupOfBone;
     groupOfBone.resize(partOfBone.size());
     for (std::size_t bone = 0; bone < partOfBone.size(); ++bone)
-        groupOfBone[bone] = group[static_cast<std::size_t>(partOfBone[bone])];
+    {
+        // The bones above the pelvis (the root of a Bip01) are not moved by the ragdoll: no
+        // vertex may stay bound to them.
+        bool driven = partBones[0] < 0;
+        for (int walk = static_cast<int>(bone); walk >= 0 && !driven;
+                walk = skeleton->getBoneParent(walk))
+            driven = walk == partBones[0];
+        groupOfBone[bone] = driven ? group[static_cast<std::size_t>(partOfBone[bone])] : -1;
+    }
+
+    // Where a bone sits, as opposed to what moves it: the bones between a part and the first part
+    // above it in the skeleton (the clavicles, between the neck and the arms) sit with the part
+    // that carries them in the physics.
+    ct::Vector<int> placeOfBone = partOfBone;
+    for (std::size_t p = 1; p < kParts; ++p)
+    {
+        if (partBones[p] < 0) continue;
+        ct::Vector<int> between;
+        int walk = skeleton->getBoneParent(partBones[p]);
+        for (; walk >= 0; walk = skeleton->getBoneParent(walk))
+        {
+            bool isPartBone = false;
+            for (std::size_t q = 0; q < kParts; ++q)
+                if (partBones[q] == walk) isPartBone = true;
+            if (isPartBone) break;
+            between.push_back(walk);
+        }
+        const int above = walk >= 0 ? partOfBone[static_cast<std::size_t>(walk)] : 0;
+        if (above == parentPart[p]) continue;
+        for (std::size_t i = 0; i < between.size(); ++i)
+            placeOfBone[static_cast<std::size_t>(between[i])] = parentPart[p];
+    }
+
+    // Which group a triangle goes to is decided by where it is, not by the skin weights (which
+    // on some models bind a head to the shoulders): the group of the bone whose segment, from its
+    // joint to the joint of a child, is nearest in the bind pose. The cut falls on a plane through
+    // each joint; the weights only smooth the joints inside a group.
+    ct::Vector<DismemberSegment> segments;
+    {
+        const Skeleton& data = skeleton->getSkeleton();
+        ct::Vector<Math::Vec3> joint;
+        ct::Vector<int> children;
+        joint.resize(static_cast<std::size_t>(boneCount));
+        children.resize(static_cast<std::size_t>(boneCount));
+        float reach = 0.0f;
+        for (int bone = 0; bone < boneCount; ++bone)
+        {
+            joint[static_cast<std::size_t>(bone)] = data.bone(static_cast<std::uint32_t>(bone))
+                                                            .inverseBind.InverseAffine()
+                                                            .GetTranslation();
+            children[static_cast<std::size_t>(bone)] = 0;
+        }
+        for (int bone = 0; bone < boneCount; ++bone)
+        {
+            const int parent = skeleton->getBoneParent(bone);
+            if (parent < 0) continue;
+            DismemberSegment segment;
+            segment.from = joint[static_cast<std::size_t>(parent)];
+            segment.to = joint[static_cast<std::size_t>(bone)];
+            segment.bone = parent;
+            bool childIsPart = false;
+            for (std::size_t q = 0; q < kParts; ++q)
+                if (partBones[q] == bone) childIsPart = true;
+            const int owner = childIsPart ? parent : bone;
+            segment.group =
+                    group[static_cast<std::size_t>(placeOfBone[static_cast<std::size_t>(owner)])];
+            reach += (segment.to - segment.from).Length();
+            segments.push_back(segment);
+            ++children[static_cast<std::size_t>(parent)];
+        }
+        for (int bone = 0; bone < boneCount; ++bone)
+        {
+            if (children[static_cast<std::size_t>(bone)] != 0) continue;
+            DismemberSegment segment;
+            segment.from = joint[static_cast<std::size_t>(bone)];
+            segment.to = segment.from;
+            segment.bone = bone;
+            segment.group =
+                    group[static_cast<std::size_t>(placeOfBone[static_cast<std::size_t>(bone)])];
+            segments.push_back(segment);
+        }
+        if (reach < 1e-4f) segments.clear();
+    }
 
     MeshStore* store = MeshStore::singleton();
     if (mMeshCut)
@@ -338,7 +483,7 @@ void Dismember3D::cutMeshes(const bool* separated)
             Node* node = getNode(mCuts[i].path);
             MeshInstance3D* instance = node ? node->castTo<MeshInstance3D>() : nullptr;
             if (!instance || instance->getMesh() != mCuts[i].cut) continue;
-            const MeshId cut = cutMesh(mCuts[i].original, groupOfBone, partBones);
+            const MeshId cut = cutMesh(mCuts[i].original, groupOfBone, partBones, segments);
             if (!cut.valid()) continue;
             instance->setMesh(cut);
             if (store) store->destroy(mCuts[i].cut);
@@ -354,7 +499,7 @@ void Dismember3D::cutMeshes(const bool* separated)
     {
         MeshInstance3D* instance = instances[i];
         const MeshId original = instance->getMesh();
-        const MeshId cut = cutMesh(original, groupOfBone, partBones);
+        const MeshId cut = cutMesh(original, groupOfBone, partBones, segments);
         if (!cut.valid()) continue;
         instance->setMesh(cut);
         Cut entry;
