@@ -672,6 +672,31 @@ void Dismember3D::cutMeshes(const bool* separated)
         for (std::size_t i = 0; i < between.size(); ++i)
             placeOfBone[static_cast<std::size_t>(between[i])] = parentPart[p];
     }
+    // ...and so do the bones hanging from them that no part carries (a Bip01 jacket's bones,
+    // under the clavicles, run down the chest to the waist).
+    {
+        ct::Vector<int> moved;
+        moved.resize(placeOfBone.size());
+        for (std::size_t bone = 0; bone < placeOfBone.size(); ++bone)
+            moved[bone] = placeOfBone[bone] != partOfBone[bone] ? placeOfBone[bone] : -1;
+        for (int bone = 0; bone < boneCount; ++bone)
+        {
+            for (int walk = skeleton->getBoneParent(bone); walk >= 0;
+                    walk = skeleton->getBoneParent(walk))
+            {
+                bool isPartBone = false;
+                for (std::size_t q = 0; q < kParts; ++q)
+                    if (partBones[q] == walk || partBones[q] == bone) isPartBone = true;
+                if (isPartBone) break;
+                if (moved[static_cast<std::size_t>(walk)] >= 0)
+                {
+                    placeOfBone[static_cast<std::size_t>(bone)] =
+                            moved[static_cast<std::size_t>(walk)];
+                    break;
+                }
+            }
+        }
+    }
 
     // Which group a triangle goes to is decided by where it is, not by the skin weights (which
     // on some models bind a head to the shoulders): the group of the bone whose segment, from its
@@ -706,6 +731,11 @@ void Dismember3D::cutMeshes(const bool* separated)
             const int owner = childIsPart ? parent : bone;
             segment.group =
                     group[static_cast<std::size_t>(placeOfBone[static_cast<std::size_t>(owner)])];
+            // The ragdoll's head is the neck bone: the neck itself stays with the body, so the
+            // head comes off at the base of the skull and not with the collar.
+            if (parent == partBones[static_cast<std::size_t>(PhysicsRagdollPart::Head)])
+                segment.group = group[static_cast<std::size_t>(
+                        parentPart[static_cast<std::size_t>(PhysicsRagdollPart::Head)])];
             reach += (segment.to - segment.from).Length();
             segments.push_back(segment);
             ++children[static_cast<std::size_t>(parent)];
