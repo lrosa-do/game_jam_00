@@ -6,6 +6,8 @@
 
 #include <ct/hashmap.hpp>
 
+#include <math.h>
+
 namespace prisma3d
 {
 
@@ -127,6 +129,171 @@ void copyVertex(const SurfaceData& in, std::uint32_t vertex, int part,
     {
         out.joints.push_back(packed);
         out.weights.push_back(weight);
+    }
+}
+
+std::uint64_t positionKey(const Math::Vec3& p)
+{
+    const std::int64_t x = static_cast<std::int64_t>(floorf(p.x * 20000.0f + 0.5f));
+    const std::int64_t y = static_cast<std::int64_t>(floorf(p.y * 20000.0f + 0.5f));
+    const std::int64_t z = static_cast<std::int64_t>(floorf(p.z * 20000.0f + 0.5f));
+    return (static_cast<std::uint64_t>(x & 0x1FFFFF) << 42) |
+           (static_cast<std::uint64_t>(y & 0x1FFFFF) << 21) |
+           static_cast<std::uint64_t>(z & 0x1FFFFF);
+}
+
+struct CapEdge
+{
+    std::uint32_t from;
+    std::uint32_t to;
+    int group;
+    int other;
+};
+
+// Closes the cuts: where a triangle of one group meets a triangle of another across an edge, the
+// edge is an open boundary of the group; the boundary of each pair of groups is closed with a fan
+// of triangles to its centre, facing out of the group, on vertices of its own that carry the
+// group's weights (the cap normal, the texture of the cut).
+void addCaps(const SurfaceData& in, const ct::Vector<int>& triGroup,
+        const ct::Vector<int>& partOfBone, const int* partBones,
+        const ct::Vector<DismemberSegment>& segments, SurfaceData& out)
+{
+    const std::size_t triangles = triGroup.size();
+    ct::HashMap<std::uint64_t, std::uint32_t> ids;
+    ct::Vector<std::uint32_t> weld;
+    weld.resize(in.positions.size());
+    for (std::size_t v = 0; v < in.positions.size(); ++v)
+    {
+        const std::uint64_t key = positionKey(in.positions[v]);
+        const std::uint32_t* found = ids.find(key);
+        if (found) weld[v] = *found;
+        else
+        {
+            const std::uint32_t id = static_cast<std::uint32_t>(ids.size());
+            ids[key] = id;
+            weld[v] = id;
+        }
+    }
+
+    ct::HashMap<std::uint64_t, std::uint32_t> seen;
+    ct::Vector<CapEdge> edges;
+    for (std::size_t t = 0; t < triangles; ++t)
+    {
+        for (std::size_t e = 0; e < 3; ++e)
+        {
+            const std::size_t i0 = t * 3 + e;
+            const std::size_t i1 = t * 3 + (e + 1) % 3;
+            const std::uint32_t a =
+                    in.indices.empty() ? static_cast<std::uint32_t>(i0) : in.indices[i0];
+            const std::uint32_t b =
+                    in.indices.empty() ? static_cast<std::uint32_t>(i1) : in.indices[i1];
+            const std::uint32_t wa = weld[a];
+            const std::uint32_t wb = weld[b];
+            if (wa == wb) continue;
+            const std::uint64_t key = wa < wb ? (static_cast<std::uint64_t>(wa) << 32) | wb
+                                              : (static_cast<std::uint64_t>(wb) << 32) | wa;
+            const std::uint32_t* other = seen.find(key);
+            if (!other)
+            {
+                seen[key] = static_cast<std::uint32_t>(i0);
+                continue;
+            }
+            const std::size_t ot = *other / 3;
+            if (triGroup[ot] == triGroup[t]) continue;
+            const std::size_t oe = *other % 3;
+            const std::size_t j0 = ot * 3 + oe;
+            const std::size_t j1 = ot * 3 + (oe + 1) % 3;
+            CapEdge mine;
+            mine.from = a;
+            mine.to = b;
+            mine.group = triGroup[t];
+            mine.other = triGroup[ot];
+            edges.push_back(mine);
+            CapEdge theirs;
+            theirs.from = in.indices.empty() ? static_cast<std::uint32_t>(j0) : in.indices[j0];
+            theirs.to = in.indices.empty() ? static_cast<std::uint32_t>(j1) : in.indices[j1];
+            theirs.group = triGroup[ot];
+            theirs.other = triGroup[t];
+            edges.push_back(theirs);
+        }
+    }
+    if (edges.empty()) return;
+
+    constexpr int kGroups = static_cast<int>(kParts);
+    for (int g = 0; g < kGroups; ++g)
+    {
+        for (int h = 0; h < kGroups; ++h)
+        {
+            if (g == h) continue;
+            Math::Vec3 centre(0.0f, 0.0f, 0.0f);
+            Math::Vec2 uv(0.0f, 0.0f);
+            int count = 0;
+            for (std::size_t k = 0; k < edges.size(); ++k)
+            {
+                if (edges[k].group != g || edges[k].other != h) continue;
+                centre = centre + in.positions[edges[k].from];
+                if (!in.uvs.empty()) uv = uv + in.uvs[edges[k].from];
+                ++count;
+            }
+            if (count < 3) continue;
+            const float scale = 1.0f / static_cast<float>(count);
+            centre = centre * scale;
+            uv = uv * scale;
+            Math::Vec3 normal(0.0f, 0.0f, 0.0f);
+            std::uint32_t first = 0;
+            bool haveFirst = false;
+            for (std::size_t k = 0; k < edges.size(); ++k)
+            {
+                if (edges[k].group != g || edges[k].other != h) continue;
+                if (!haveFirst)
+                {
+                    first = edges[k].from;
+                    haveFirst = true;
+                }
+                normal = normal + Math::Vec3::Cross(in.positions[edges[k].to] - centre,
+                                          in.positions[edges[k].from] - centre);
+            }
+            const float length = normal.Length();
+            if (length < 1e-12f) continue;
+            normal = normal * (1.0f / length);
+
+            const std::uint32_t hub = static_cast<std::uint32_t>(out.positions.size());
+            out.positions.push_back(centre);
+            if (!in.normals.empty()) out.normals.push_back(normal);
+            if (!in.tangents.empty()) out.tangents.push_back(in.tangents[first]);
+            if (!in.colors.empty()) out.colors.push_back(in.colors[first]);
+            if (!in.uvs.empty()) out.uvs.push_back(uv);
+            if (!in.uvs2.empty()) out.uvs2.push_back(in.uvs2[first]);
+            const int bone = segments.empty()
+                                     ? partBones[g]
+                                     : nearestBoneOf(centre, g, partOfBone, segments, partBones[g]);
+            out.joints.push_back(static_cast<std::uint32_t>(bone < 0 ? 0 : bone));
+            out.weights.push_back(Math::Vec4(1.0f, 0.0f, 0.0f, 0.0f));
+
+            ct::HashMap<std::uint64_t, std::uint32_t> rim;
+            for (std::size_t k = 0; k < edges.size(); ++k)
+            {
+                if (edges[k].group != g || edges[k].other != h) continue;
+                std::uint32_t index[2];
+                const std::uint32_t corner[2] = { edges[k].from, edges[k].to };
+                for (int c = 0; c < 2; ++c)
+                {
+                    const std::uint32_t* found = rim.find(corner[c]);
+                    if (found)
+                    {
+                        index[c] = *found;
+                        continue;
+                    }
+                    index[c] = static_cast<std::uint32_t>(out.positions.size());
+                    copyVertex(in, corner[c], g, partOfBone, partBones[g], segments, out);
+                    if (!out.normals.empty()) out.normals.back() = normal;
+                    rim[corner[c]] = index[c];
+                }
+                out.indices.push_back(hub);
+                out.indices.push_back(index[1]);
+                out.indices.push_back(index[0]);
+            }
+        }
     }
 }
 
@@ -295,6 +462,7 @@ MeshId Dismember3D::cutMesh(MeshId source, const ct::Vector<int>& partOfBone, co
         SurfaceData out;
         out.topology = in.topology;
         ct::HashMap<std::uint64_t, std::uint32_t> remap;
+        ct::Vector<int> triGroup;
         for (std::size_t t = 0; t + 2 < count; t += 3)
         {
             std::uint32_t corners[3];
@@ -319,6 +487,7 @@ MeshId Dismember3D::cutMesh(MeshId source, const ct::Vector<int>& partOfBone, co
                     }
                 }
             }
+            triGroup.push_back(part);
             for (int c = 0; c < 3; ++c)
             {
                 const std::uint64_t key = (static_cast<std::uint64_t>(corners[c]) << 8) |
@@ -335,6 +504,7 @@ MeshId Dismember3D::cutMesh(MeshId source, const ct::Vector<int>& partOfBone, co
                 out.indices.push_back(index);
             }
         }
+        if (!segments.empty()) addCaps(in, triGroup, partOfBone, partBones, segments, out);
         if (!store->addSurface(mesh, out, name.c_str()))
         {
             store->destroy(mesh);
