@@ -163,7 +163,9 @@ class Breakable(Node3D):
             fx.global_position = point
         return fx
 
-    def hit(self, point, normal, direction, damage):
+    # source: who hit it (the player passes herself); only her own hit on the hack terminal is a
+    # game over, a blast or a cop's stray shot is not.
+    def hit(self, point, normal, direction, damage, source=None):
         if self._body == None:
             self.setup()
         if self.kind == "":
@@ -171,7 +173,7 @@ class Breakable(Node3D):
         if self.kind == "glass":
             self.hit_glass(point, normal, direction, damage)
         elif self.kind == "monitor":
-            self.hit_monitor(point, normal)
+            self.hit_monitor(point, normal, source)
         elif self.kind == "extinguisher":
             self.hit_extinguisher(point, normal)
         elif self.kind == "cooler":
@@ -247,13 +249,13 @@ class Breakable(Node3D):
         self.free_body()
 
     # A screen pops: the glass bursts out with sparks and a small bang, and the hole smokes.
-    def hit_monitor(self, point, normal):
+    def hit_monitor(self, point, normal, source=None):
         if self._broken:
             return
         self._broken = True
         c = self.center()
         scene = self.effects_parent()
-        if scene != None and scene.is_in_group("game") and scene.story != None:
+        if source != None and source.is_in_group("player") and scene != None and scene.is_in_group("game") and scene.story != None:
             scene.story.terminal_broken(c)
         fx = self.spawn("Assets/Prefabs/impact.scene.json", point)
         if fx != None:

@@ -553,7 +553,7 @@ class Player(CharacterBody3D):
         damage = 140.0 if self._melee_kind == "flying_kick" else 60.0
         self._snd_melee.play()
         self._kick = 1.5
-        hit.node.get_node("Breakable").hit(hit.position, hit.normal, f, damage)
+        hit.node.get_node("Breakable").hit(hit.position, hit.normal, f, damage, self)
 
     def update_overclock(self, delta):
         real = delta
@@ -931,7 +931,7 @@ class Player(CharacterBody3D):
         body = hit.node
         kind = "default"
         if body != None and body.is_in_group("breakable"):
-            body.get_node("Breakable").hit(hit.position, hit.normal, direction, self.damage)
+            body.get_node("Breakable").hit(hit.position, hit.normal, direction, self.damage, self)
             return
         fx = None
         if body == None or not body.is_in_group("enemy"):
