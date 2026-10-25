@@ -55,7 +55,7 @@ int dominantPart(const SurfaceData& in, const std::uint32_t* corners,
         for (int j = 0; j < 4; ++j)
         {
             const std::uint32_t bone = (packed >> (8 * j)) & 0xFFu;
-            if (weights[j] > 0.0f && bone < partOfBone.size())
+            if (weights[j] > 0.0f && bone < partOfBone.size() && partOfBone[bone] >= 0)
                 score[static_cast<std::size_t>(partOfBone[bone])] += weights[j];
         }
     }
@@ -225,73 +225,152 @@ void addCaps(const SurfaceData& in, const ct::Vector<int>& triGroup,
         for (int h = 0; h < kGroups; ++h)
         {
             if (g == h) continue;
-            Math::Vec3 centre(0.0f, 0.0f, 0.0f);
-            Math::Vec2 uv(0.0f, 0.0f);
-            int count = 0;
+            ct::Vector<std::size_t> pair;
             for (std::size_t k = 0; k < edges.size(); ++k)
-            {
-                if (edges[k].group != g || edges[k].other != h) continue;
-                centre = centre + in.positions[edges[k].from];
-                if (!in.uvs.empty()) uv = uv + in.uvs[edges[k].from];
-                ++count;
-            }
-            if (count < 3) continue;
-            const float scale = 1.0f / static_cast<float>(count);
-            centre = centre * scale;
-            uv = uv * scale;
-            Math::Vec3 normal(0.0f, 0.0f, 0.0f);
-            std::uint32_t first = 0;
-            bool haveFirst = false;
-            for (std::size_t k = 0; k < edges.size(); ++k)
-            {
-                if (edges[k].group != g || edges[k].other != h) continue;
-                if (!haveFirst)
-                {
-                    first = edges[k].from;
-                    haveFirst = true;
-                }
-                normal = normal + Math::Vec3::Cross(in.positions[edges[k].to] - centre,
-                                          in.positions[edges[k].from] - centre);
-            }
-            const float length = normal.Length();
-            if (length < 1e-12f) continue;
-            normal = normal * (1.0f / length);
+                if (edges[k].group == g && edges[k].other == h) pair.push_back(k);
+            if (pair.size() < 3) continue;
 
-            const std::uint32_t hub = static_cast<std::uint32_t>(out.positions.size());
-            out.positions.push_back(centre);
-            if (!in.normals.empty()) out.normals.push_back(normal);
-            if (!in.tangents.empty()) out.tangents.push_back(in.tangents[first]);
-            if (!in.colors.empty()) out.colors.push_back(in.colors[first]);
-            if (!in.uvs.empty()) out.uvs.push_back(uv);
-            if (!in.uvs2.empty()) out.uvs2.push_back(in.uvs2[first]);
-            const int bone = segments.empty()
-                                     ? partBones[g]
-                                     : nearestBoneOf(centre, g, partOfBone, segments, partBones[g]);
-            out.joints.push_back(static_cast<std::uint32_t>(bone < 0 ? 0 : bone));
-            out.weights.push_back(Math::Vec4(1.0f, 0.0f, 0.0f, 0.0f));
-
-            ct::HashMap<std::uint64_t, std::uint32_t> rim;
-            for (std::size_t k = 0; k < edges.size(); ++k)
+            // Each closed ring of the boundary gets a cap of its own (a sleeve and its lining are
+            // two rings): the edges are joined through the welded corners they share.
+            ct::Vector<std::size_t> ring;
+            ring.resize(pair.size());
+            for (std::size_t i = 0; i < pair.size(); ++i) ring[i] = i;
+            ct::HashMap<std::uint64_t, std::uint32_t> cornerEdge;
+            for (std::size_t i = 0; i < pair.size(); ++i)
             {
-                if (edges[k].group != g || edges[k].other != h) continue;
-                std::uint32_t index[2];
-                const std::uint32_t corner[2] = { edges[k].from, edges[k].to };
+                const std::uint32_t ends[2] = { weld[edges[pair[i]].from],
+                    weld[edges[pair[i]].to] };
                 for (int c = 0; c < 2; ++c)
                 {
-                    const std::uint32_t* found = rim.find(corner[c]);
-                    if (found)
+                    const std::uint32_t* found = cornerEdge.find(ends[c]);
+                    if (!found)
                     {
-                        index[c] = *found;
+                        cornerEdge[ends[c]] = static_cast<std::uint32_t>(i);
                         continue;
                     }
-                    index[c] = static_cast<std::uint32_t>(out.positions.size());
-                    copyVertex(in, corner[c], g, partOfBone, partBones[g], segments, out);
-                    if (!out.normals.empty()) out.normals.back() = normal;
-                    rim[corner[c]] = index[c];
+                    std::size_t a = i;
+                    while (ring[a] != a) a = ring[a];
+                    std::size_t b = *found;
+                    while (ring[b] != b) b = ring[b];
+                    if (a != b) ring[a] = b;
                 }
-                out.indices.push_back(hub);
-                out.indices.push_back(index[1]);
-                out.indices.push_back(index[0]);
+            }
+            for (std::size_t i = 0; i < pair.size(); ++i)
+            {
+                std::size_t root = i;
+                while (ring[root] != root) root = ring[root];
+                ring[i] = root;
+            }
+
+            for (std::size_t r = 0; r < pair.size(); ++r)
+            {
+                if (ring[r] != r) continue;
+                Math::Vec3 centre(0.0f, 0.0f, 0.0f);
+                Math::Vec2 uv(0.0f, 0.0f);
+                int count = 0;
+                for (std::size_t i = 0; i < pair.size(); ++i)
+                {
+                    if (ring[i] != r) continue;
+                    centre = centre + in.positions[edges[pair[i]].from];
+                    if (!in.uvs.empty()) uv = uv + in.uvs[edges[pair[i]].from];
+                    ++count;
+                }
+                if (count < 3) continue;
+                const float scale = 1.0f / static_cast<float>(count);
+                centre = centre * scale;
+                uv = uv * scale;
+                Math::Vec3 normal(0.0f, 0.0f, 0.0f);
+                for (std::size_t i = 0; i < pair.size(); ++i)
+                {
+                    if (ring[i] != r) continue;
+                    const CapEdge& edge = edges[pair[i]];
+                    normal = normal + Math::Vec3::Cross(in.positions[edge.to] - centre,
+                                              in.positions[edge.from] - centre);
+                }
+                const float length = normal.Length();
+                if (length < 1e-12f) continue;
+                normal = normal * (1.0f / length);
+
+                // The rim: copies of the boundary corners with the group's weights and the cap
+                // normal; the tangent is turned to lie in the cap.
+                const std::size_t rimStart = out.positions.size();
+                ct::HashMap<std::uint64_t, std::uint32_t> rim;
+                ct::Vector<std::uint32_t> fan;
+                for (std::size_t i = 0; i < pair.size(); ++i)
+                {
+                    if (ring[i] != r) continue;
+                    const std::uint32_t corner[2] = { edges[pair[i]].from, edges[pair[i]].to };
+                    std::uint32_t index[2];
+                    for (int c = 0; c < 2; ++c)
+                    {
+                        const std::uint32_t* found = rim.find(corner[c]);
+                        if (found)
+                        {
+                            index[c] = *found;
+                            continue;
+                        }
+                        index[c] = static_cast<std::uint32_t>(out.positions.size());
+                        copyVertex(in, corner[c], g, partOfBone, partBones[g], segments, out);
+                        if (!out.normals.empty()) out.normals.back() = normal;
+                        if (!out.tangents.empty())
+                        {
+                            Math::Vec4& tangent = out.tangents.back();
+                            Math::Vec3 axis(tangent.x, tangent.y, tangent.z);
+                            axis = axis - normal * normal.Dot(axis);
+                            const float axisLength = axis.Length();
+                            if (axisLength > 1e-6f) axis = axis * (1.0f / axisLength);
+                            tangent = Math::Vec4(axis.x, axis.y, axis.z, tangent.w);
+                        }
+                        rim[corner[c]] = index[c];
+                    }
+                    fan.push_back(index[1]);
+                    fan.push_back(index[0]);
+                }
+
+                // The centre: the mean of the rim's weights (the four heaviest bones), so it bends
+                // with the rim instead of following a single bone.
+                float boneWeight[256] = {};
+                for (std::size_t v = rimStart; v < out.positions.size(); ++v)
+                {
+                    const Math::Vec4& w = out.weights[v];
+                    const float weights[4] = { w.x, w.y, w.z, w.w };
+                    for (int j = 0; j < 4; ++j)
+                        boneWeight[(out.joints[v] >> (8 * j)) & 0xFFu] += weights[j];
+                }
+                std::uint32_t hubJoints = 0;
+                float hubWeights[4] = {};
+                float hubSum = 0.0f;
+                for (int j = 0; j < 4; ++j)
+                {
+                    int best = -1;
+                    for (int b = 0; b < 256; ++b)
+                        if (boneWeight[b] > 0.0f && (best < 0 || boneWeight[b] > boneWeight[best]))
+                            best = b;
+                    if (best < 0) break;
+                    hubJoints |= static_cast<std::uint32_t>(best) << (8 * j);
+                    hubWeights[j] = boneWeight[best];
+                    hubSum += boneWeight[best];
+                    boneWeight[best] = 0.0f;
+                }
+                if (hubSum <= 0.0f) continue;
+
+                const std::uint32_t hub = static_cast<std::uint32_t>(out.positions.size());
+                const std::uint32_t first = static_cast<std::uint32_t>(rimStart);
+                out.positions.push_back(centre);
+                if (!out.normals.empty()) out.normals.push_back(normal);
+                if (!out.tangents.empty()) out.tangents.push_back(out.tangents[first]);
+                if (!out.colors.empty()) out.colors.push_back(out.colors[first]);
+                if (!out.uvs.empty()) out.uvs.push_back(uv);
+                if (!out.uvs2.empty()) out.uvs2.push_back(out.uvs2[first]);
+                out.joints.push_back(hubJoints);
+                out.weights.push_back(Math::Vec4(hubWeights[0] / hubSum, hubWeights[1] / hubSum,
+                        hubWeights[2] / hubSum, hubWeights[3] / hubSum));
+                for (std::size_t i = 0; i + 1 < fan.size(); i += 2)
+                {
+                    out.indices.push_back(hub);
+                    out.indices.push_back(fan[i]);
+                    out.indices.push_back(fan[i + 1]);
+                }
             }
         }
     }
