@@ -1,0 +1,39 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "Node3D",
+    "name": "Pickup",
+    "properties": {
+      "script": "Assets/Scripts/pickup.py",
+      "kind": "energy",
+      "amount": 60
+    },
+    "children": [
+      {
+        "instance": "Assets/Models/Pickups/energy.glb",
+        "name": "Mesh",
+        "properties": {
+          "position": [
+            0,
+            0.25,
+            0
+          ]
+        }
+      },
+      {
+        "class": "MeshInstance3D",
+        "name": "Ring",
+        "properties": {
+          "position": [
+            0,
+            0.02,
+            0
+          ],
+          "mesh": "primitive:torus?major_radius=0.22&minor_radius=0.012",
+          "material_override": "Assets/Materials/pickups.mat::ring_energy"
+        }
+      }
+    ]
+  }
+}

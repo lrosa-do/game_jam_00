@@ -1,0 +1,7 @@
+material "LavaRC_Material_u1_v1" {
+    cull             = None
+    lit              = false
+    color            = (0.75, 0.75, 0.75, 1)
+    albedo           = "gothic_cloister_corner_textures/embedded_43745900.jpg"
+}
+

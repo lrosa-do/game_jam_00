@@ -1,0 +1,93 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "CharacterBody3D",
+    "name": "Prisoner",
+    "groups": [
+      "enemy",
+      "damageable"
+    ],
+    "properties": {
+      "script": "Assets/Scripts/enemy.py",
+      "radius": 0.3,
+      "height": 1.1,
+      "idle_clip": "Custom_Sit_Boozehound",
+      "civilian": true,
+      "health": 30.0,
+      "energy_drop": 0.0,
+      "push_force": 30.0,
+      "collision_mask": 3
+    },
+    "children": [
+      {
+        "class": "CollisionShape3D",
+        "name": "Shape",
+        "properties": {
+          "shape_type": 3,
+          "capsule_radius": 0.3,
+          "capsule_height": 1.7
+        }
+      },
+      {
+        "instance": "Assets/Models/People/boozehound.glb",
+        "name": "Model",
+        "properties": {
+          "position": [
+            0.0,
+            -0.85,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            3.14159265,
+            0.0
+          ]
+        }
+      },
+      {
+        "class": "Ragdoll3D",
+        "name": "Ragdoll"
+      },
+      {
+        "class": "Dismember3D",
+        "name": "Dismember",
+        "properties": {
+          "ragdoll": "../Ragdoll"
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Shot",
+        "properties": {
+          "stream": "Assets/Sounds/weapons/shoot_beretta.ogg",
+          "attenuation_model": 1,
+          "max_distance": 40.0,
+          "unit_size": 4.0,
+          "volume_linear": 0.8
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Voice",
+        "properties": {
+          "attenuation_model": 1,
+          "max_distance": 30.0,
+          "unit_size": 3.0,
+          "volume_linear": 1.0
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Hit",
+        "properties": {
+          "stream": "Assets/Sounds/cop/punch_01.wav",
+          "attenuation_model": 1,
+          "max_distance": 25.0,
+          "unit_size": 3.0,
+          "volume_linear": 1.0
+        }
+      }
+    ]
+  }
+}

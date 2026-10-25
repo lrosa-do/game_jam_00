@@ -1,0 +1,300 @@
+#ifndef ZEN_OPCODES_H
+#define ZEN_OPCODES_H
+
+/*
+** opcodes.h — Todas as instruções da VM.
+**
+** Formato: 32 bits  [ opcode(8) | A(8) | B(8) | C(8) ]
+** ou:      32 bits  [ opcode(8) | A(8) | Bx(16) ]       para constantes
+** ou:      32 bits  [ opcode(8) | A(8) | sBx(16) ]      para jumps
+**
+** A  = registo destino
+** B  = registo fonte ou índice curto
+** C  = registo fonte 2
+** Bx = índice 16-bit (constantes, globais)
+** sBx = signed 16-bit offset (jumps)
+*/
+
+namespace zen
+{
+
+    enum OpCode : uint8_t
+    {
+        /* --- Load/Store --- */
+        OP_LOADNIL,  /* R[A] = nil                              */
+        OP_LOADBOOL, /* R[A] = (bool)B; se C: pc++              */
+        OP_LOADK,    /* R[A] = constants[Bx]                    */
+        OP_LOADI,    /* R[A] = (int)sBx                         */
+        OP_MOVE,     /* R[A] = R[B]                             */
+
+        /* --- Globals (indexados) --- */
+        OP_GETGLOBAL, /* R[A] = globals[Bx]                      */
+        OP_SETGLOBAL, /* globals[Bx] = R[A]                      */
+
+        /* --- Aritmética --- */
+        OP_ADD, /* R[A] = R[B] + R[C]                      */
+        OP_SUB, /* R[A] = R[B] - R[C]                      */
+        OP_MUL, /* R[A] = R[B] * R[C]                      */
+        OP_DIV, /* R[A] = R[B] / R[C]                      */
+        OP_IDIV, /* R[A] = R[B] // R[C]  (floor division)   */
+        OP_MOD, /* R[A] = R[B] % R[C]                      */
+        OP_POW, /* R[A] = R[B] ** R[C]                     */
+        OP_NEG, /* R[A] = -R[B]                            */
+
+        /* --- Object operator overloads (compiler-selected cold path) --- */
+        OP_ADD_OBJ, /* R[A] = R[B].__add__(R[C])              */
+        OP_SUB_OBJ, /* R[A] = R[B].__sub__(R[C])              */
+        OP_MUL_OBJ, /* R[A] = R[B].__mul__(R[C])              */
+        OP_DIV_OBJ, /* R[A] = R[B].__div__(R[C])              */
+        OP_MOD_OBJ, /* R[A] = R[B].__mod__(R[C])              */
+        OP_NEG_OBJ, /* R[A] = R[B].__neg__()                  */
+        OP_EQ_OBJ,  /* R[A] = R[B].__eq__(R[C])               */
+        OP_LT_OBJ,  /* R[A] = R[B].__lt__(R[C])               */
+        OP_LE_OBJ,  /* R[A] = R[B].__le__(R[C])               */
+
+        /* --- Aritmética imediata (superinstruções) --- */
+        OP_ADDI, /* R[A] = R[B] + (signed)C                 */
+        OP_SUBI, /* R[A] = R[B] - (signed)C                 */
+
+        /* --- Bitwise --- */
+        OP_BAND, /* R[A] = R[B] & R[C]                      */
+        OP_BOR,  /* R[A] = R[B] | R[C]                      */
+        OP_BXOR, /* R[A] = R[B] ^ R[C]                      */
+        OP_BNOT, /* R[A] = ~R[B]                            */
+        OP_SHL,  /* R[A] = R[B] << R[C]                     */
+        OP_SHR,  /* R[A] = R[B] >> R[C]                     */
+
+        /* --- Comparação (result em R[A]) --- */
+        OP_EQ,  /* R[A] = (R[B] == R[C])                   */
+        OP_LT,  /* R[A] = (R[B] <  R[C])                   */
+        OP_LE,  /* R[A] = (R[B] <= R[C])                   */
+        OP_NOT, /* R[A] = !R[B]                            */
+        OP_CONTAINS, /* R[A] = (R[B] in R[C])                  */
+        OP_IS,  /* R[A] = (R[B] is R[C])  (identity check)    */
+
+        /* --- Jumps --- */
+        OP_JMP,      /* pc += sBx                               */
+        OP_JMPIF,    /* se truthy(R[A]): pc += sBx              */
+        OP_JMPIFNOT, /* se !truthy(R[A]): pc += sBx             */
+
+        /* --- Funções --- */
+        OP_CALL,       /* R[A](R[A+1]..R[A+B]) → R[A]..R[A+C-1]  */
+        OP_CALLGLOBAL, /* globals[Bx(word2)](R[A+1]..+B) → R[A]..+C — 2 words */
+        OP_RETURN,     /* return R[A]..R[A+B-1] (B=nresults)       */
+
+        /* --- Closures / Upvalues --- */
+        OP_CLOSURE,  /* R[A] = closure(constants[Bx])            */
+        OP_GETUPVAL, /* R[A] = upvalues[B]                       */
+        OP_SETUPVAL, /* upvalues[B] = R[A]                       */
+        OP_CLOSE,    /* close upvalues >= R[A] (ao sair de scope)*/
+
+        /* --- Fibers --- */
+        OP_NEWFIBER, /* R[A] = Fiber.new(R[B])  (B=closure)     */
+        OP_RESUME,   /* R[A] = R[B].resume(R[C])                 */
+        OP_YIELD,    /* R[A] = yield R[B] (yield B, receive into A) */
+        OP_AWAIT,    /* R[A] = await R[B] (resume B until done)  */
+
+        /* --- Iteration --- */
+        OP_FOR_ITER, /* R[A] = next(R[B]); if done pc += sBx (2-word) */
+
+        /* --- Objects --- */
+        OP_NEWARRAY,  /* R[A] = []                               */
+        OP_NEWMAP,    /* R[A] = {}                               */
+        OP_NEWSET,    /* R[A] = set()                            */
+        OP_NEWBUFFER, /* R[A] = TypedArray(R[B]); C=BufferType   */
+        OP_APPEND,    /* R[A].push(R[B])                         */
+        OP_SETADD,    /* R[A].add(R[B])  (set add)               */
+        OP_GETFIELD, /* R[A] = R[B].constants[C]  (field name)  */
+        OP_SETFIELD, /* R[A].constants[B] = R[C]                */
+        OP_GETFIELD_IDX, /* R[A] = R[B].fields[C]  (direct index, O(1)) */
+        OP_SETFIELD_IDX, /* R[A].fields[B] = R[C]  (direct index, O(1)) */
+        OP_GETINDEX,  /* R[A] = R[B][R[C]]                       */
+        OP_SETINDEX,  /* R[A][R[B]] = R[C]                       */
+        OP_DELINDEX,  /* del R[A][R[B]]                           */
+        OP_GETSLICE,  /* R[A] = R[B][R[C]:R[C+1]:R[C+2]]        */
+        OP_INVOKE,   /* R[A].method(R[A+1]..R[A+B]) → R[A]; C=name_idx (2-word: word2=name_ki) */
+        OP_INVOKE_VT, /* R[A].vtable[C](R[A+1]..R[A+B]) → R[A]; single-word, O(1) */
+        OP_SUPER_INVOKE, /* like OP_INVOKE but dispatches on parent class vtable (2-word) */
+
+        /* --- Classes --- */
+        OP_NEWCLASS,    /* R[A] = new class (nome em constants[B]) */
+        OP_NEWINSTANCE, /* R[A] = klass.new()                      */
+        OP_GETMETHOD,   /* R[A] = R[B]:method(constants[C])        */
+        OP_CLASSFIELD,  /* as_class(R[A]).field_names[B] = K[C]    */
+
+        /* --- Misc --- */
+        OP_CONCAT,   /* R[A] = R[B] .. R[C]  (string concat)   */
+        OP_STRADD,   /* R[A] = R[A] + R[B]  (in-place append)  */
+        OP_TOSTRING, /* R[A] = tostring(R[B])                   */
+        OP_TOSTRING_OBJ, /* R[A] = R[B].__str__()                */
+        OP_LEN,      /* R[A] = #R[B]; C=1: tolerant (comprehension bound: nil/no length -> 0 instead of erroring) */
+        OP_PRINT,    /* print R[A]; B=1 → newline               */
+
+        /* --- Fused comparison + jump (2-word) --- */
+        OP_LTJMPIFNOT, /* if !(R[B] < R[C]): pc += sBx(next_word)  */
+        OP_LEJMPIFNOT, /* if !(R[B] <= R[C]): pc += sBx(next_word) */
+
+        /* --- Numeric for loop (superinstruction) --- */
+        OP_FORPREP, /* range(R[A],R[A+1],R[A+2]) → count in R[A+1], R[A+3]=R[A]; empty: pc+=sBx */
+        OP_FORLOOP, /* if --R[A+1]>0: R[A]+=R[A+2]; R[A+3]=R[A]; pc+=sBx (loop)  */
+
+        /* --- Fused field+arith (2-word superinstructions) --- */
+        OP_GETFIELD_MUL, /* word1: R[A]=R[B].fields[C]; word2: R[A]=R[B]*R[C] */
+        OP_GETFIELD_SUB, /* word1: R[A]=R[B].fields[C]; word2: R[A]=R[B]-R[C] */
+
+        /* --- Iteration (foreach) --- */
+        OP_ITER_ELEM, /* R[A] = iter_elem(R[B], R[C]) — ordinal access for foreach */
+
+        /* --- Eval --- */
+        OP_EVAL, /* compile+run string R[B]; result → R[A]  */
+
+        /* --- Assert --- */
+        OP_ASSERT, /* if !truthy(R[A]): AssertionError(R[B])   */
+
+        OP_HALT,
+
+        /* --- Modules --- */
+        OP_IMPORT,     /* R[A] = import(constants[Bx]); module as ObjMap */
+
+        /* as_class(R[A]).field_defaults[B] = K[C] — the value a class body
+        ** assignment gave a field, copied into every new instance. Added
+        ** last on purpose: the opcode numbering is part of the bytecode
+        ** format, so existing ones must keep their values. */
+        OP_CLASSFIELDDEF,
+        /* The augmented-assignment pair for globals: g += expr compiles to
+        ** GETGLOBAL_AUG r / <rhs> / ADD r,r,rhs / SETGLOBAL_AUG r. Neither
+        ** marks OBJ_FLAG_SHARED, so a global string accumulator stays
+        ** unshared and ADD's in-place append applies — the difference
+        ** between O(n) and O(n²) for `s += "x"` at top level. Sound because
+        ** every OTHER route a global takes into a register or slot does
+        ** mark: plain GETGLOBAL, SETGLOBAL, call arguments, yields, pushes.
+        ** An unshared global string therefore has exactly one holder — the
+        ** slot this pair reads and rewrites. */
+        OP_GETGLOBAL_AUG,
+        OP_SETGLOBAL_AUG,
+
+        /* --- Reified generics: f<T,U>(args) / obj.m<T>(args) ---
+        ** Type args and value args are counted separately (unlike the old
+        ** f<T>(x) == f(T,x) sugar). Registers are still contiguous, no
+        ** allocation: [T0,T1,...,arg0,arg1,...] right after the callee
+        ** (or after 'self' for a method). See ObjFunc::generic_arity. */
+        OP_CALL_GENERIC,   /* word1: R[A](gT..gT+B2-1 | args..) ABC=base,nargs,nresults (2-word)
+                            ** word2: ngeneric (16-bit, low half) — generic arg count */
+        OP_INVOKE_GENERIC, /* like OP_INVOKE, plus a 3rd word carrying ngeneric (3-word) */
+
+        /* as_class(R[A]).flatten_vtable_from_parent() — copies every nil
+        ** slot in R[A]'s vtable from its parent's vtable (recursively
+        ** already-flattened, since a class always compiles/runs before its
+        ** subclasses), so OP_INVOKE's vtable lookup finds an inherited,
+        ** non-overridden method in O(1) instead of walking the parent
+        ** chain. Emitted once, right after a script class body finishes
+        ** (after every OP_SETFIELD that could have added a method) — see
+        ** ClassBuilder::end()'s "Flatten parent vtable" in vm.cpp for the
+        ** equivalent native-class path this mirrors. No-op if R[A] has no
+        ** parent or the parent's vtable is empty. */
+        OP_CLASSFLATTEN,
+
+        /* Marks a completed class immutable. Emitted once at the end of a
+        ** script class body; ClassBuilder::end() does the native equivalent. */
+        OP_CLASSSEAL,
+
+        /* Fully static script-method call. The compiler emits it only for
+        ** an explicitly typed receiver with an exact, non-generic arity. */
+        OP_INVOKE_VT_FAST,
+
+        /* Five-word movement update fusion. The following four words retain
+        ** the original GETFIELD_MUL/MUL/ADD/SETFIELD_IDX sequence so the VM
+        ** can deopt without changing language semantics. */
+        OP_FIELD_MULADD,
+
+        /* --- Compare-with-immediate branches (2-word: sBx in the next word)
+        ** if !(R[B] <op> C), C a signed 8-bit literal — the `i < 10`,
+        ** `hp <= 0`, `n > 2` shape of loop bounds and guards, without a
+        ** LOADI per test. Operand types behave exactly as in LTJMPIFNOT
+        ** with the literal in a register (numbers, strings, __lt__/__le__). */
+        OP_LTIJMPIFNOT, /* if !(R[B] <  C): pc += sBx(next word) */
+        OP_LEIJMPIFNOT, /* if !(R[B] <= C)                        */
+        OP_GTIJMPIFNOT, /* if !(R[B] >  C), i.e. !(C <  R[B])     */
+        OP_GEIJMPIFNOT, /* if !(R[B] >= C), i.e. !(C <= R[B])     */
+
+        /* --- Branches on None (1-word, A + sBx) ---
+        ** `if x is None:` / `if x == None:` and their negations branch on
+        ** R[A] directly instead of LOADNIL + EQ/IS + JMPIFNOT. The EQ pair
+        ** still honours a class's __eq__; the IS pair is pure identity. */
+        OP_JMPIFNIL,    /* if R[A] is None:      pc += sBx  (`x is not None:`) */
+        OP_JMPIFNOTNIL, /* if R[A] is not None:  pc += sBx  (`x is None:`)     */
+        OP_JMPIFEQNIL,  /* if R[A] == None:      pc += sBx  (`x != None:`)     */
+        OP_JMPIFNEQNIL, /* if R[A] != None:      pc += sBx  (`x == None:`)     */
+
+        /* --- for-each step at the bottom of the loop (2-word) ---
+        ** word1: A = loop variable, B = iterable (R[B+1] is the cursor);
+        ** word2: signed offset back to the body. If R[B] has a next element
+        ** it goes to R[A] and pc += offset; otherwise fall through. The loop
+        ** is entered by a JMP to this instruction, so one dispatch per
+        ** iteration replaces FOR_ITER + JMP. */
+        OP_FOR_NEXT,
+
+        /* --- Checked direct field access (2-word) ---
+        ** For a receiver whose class the compiler knows statically but
+        ** cannot vouch for (an annotated parameter, an inferred local, an
+        ** Array[T] element): word1 carries the field index, word2 is the
+        ** ordinary by-name GETFIELD/SETFIELD. If the instance's class has
+        ** that very field name at that index the access is O(1) and word2
+        ** is skipped; otherwise word2 runs as it always would. */
+        OP_GETFIELD_IDXC, /* word1: R[A] = R[B].fields[C] if names match; word2: GETFIELD A,B,name */
+        OP_SETFIELD_IDXC, /* word1: R[A].fields[B] = R[C] if names match; word2: SETFIELD A,name,C */
+
+        /* Equality against an 8-bit literal, fused with the branch (2-word,
+        ** like LTIJMPIFNOT): `if x == 0:` / `if n != 1:`. Same operand
+        ** semantics as EQ with the literal in a register (int/float
+        ** cross-type equality, __eq__ on instances). */
+        OP_EQIJMPIFNOT, /* if !(R[B] == C): pc += sBx(next word) */
+        OP_NEIJMPIFNOT, /* if !(R[B] != C): pc += sBx(next word) */
+
+        /* Method call whose receiver is a local variable (`b.m()`,
+        ** `self.m()`): the VM copies R[C] into R[A] itself instead of a
+        ** separate MOVE. Word 2 as in OP_INVOKE / OP_INVOKE_VT; the result
+        ** count is always 1 (multi-assign keeps the two-instruction form). */
+        OP_INVOKE_R,    /* R[A] = R[C]; R[A] = R[A].method(R[A+1]..R[A+B]) (2-word) */
+        OP_INVOKE_VT_R, /* same, trying the vtable slot first like OP_INVOKE_VT (2-word) */
+
+        /* Register-register equality fused with the branch (2-word, like
+        ** LTJMPIFNOT): `if cur == goal:` / `while a != b:`. Same operand
+        ** semantics as OP_EQ (deep equality, __eq__ on instances). */
+        OP_EQJMPIFNOT, /* if !(R[B] == R[C]): pc += sBx(next word) */
+        OP_NEJMPIFNOT, /* if !(R[B] != R[C]): pc += sBx(next word) */
+
+        /* `return` with no value and the implicit end of a function:
+        ** LOADNIL R[0] + RETURN R[0] as one dispatch (R[0] is dead here). */
+        OP_NEXT,     /* R[A] = next(R[B]) — advance a generator/fiber one step */
+        OP_RETURNNIL,
+        /* A class body field whose name or default sits past constant 255,
+        ** where OP_CLASSFIELD / OP_CLASSFIELDDEF cannot reach (8-bit C): the
+        ** compiler first loads the constant into R[C] with OP_LOADK. Added
+        ** after OP_RETURNNIL so no existing opcode changes its number. */
+        OP_CLASSFIELD_R,    /* as_class(R[A]).field_names[B] = as_string(R[C]) */
+        OP_CLASSFIELDDEF_R, /* LAST opcode — as_class(R[A]).field_defaults[B] = R[C].
+                            ** s_opnames (debug.cpp) and dispatch_table
+                            ** (vm_dispatch.cpp) are sized against this one and
+                            ** static_assert on it. Add new opcodes BELOW this line
+                            ** and move the mark, and add their entry to both tables. */
+    };
+
+/* Encode/Decode — ABC format */
+#define ZEN_ENCODE(op, a, b, c) ((uint32_t)((op) << 24) | ((a) << 16) | ((b) << 8) | (c))
+#define ZEN_OP(i) ((uint8_t)(((i) >> 24) & 0xFF))
+#define ZEN_A(i) ((uint8_t)(((i) >> 16) & 0xFF))
+#define ZEN_B(i) ((uint8_t)(((i) >> 8) & 0xFF))
+#define ZEN_C(i) ((uint8_t)((i) & 0xFF))
+
+/* Encode/Decode — ABx format (16-bit unsigned operand) */
+#define ZEN_ENCODE_BX(op, a, bx) ((uint32_t)((op) << 24) | ((a) << 16) | ((bx) & 0xFFFF))
+#define ZEN_BX(i) ((uint16_t)((i) & 0xFFFF))
+
+/* Encode/Decode — AsBx format (16-bit signed offset) */
+#define ZEN_ENCODE_SBX(op, a, sbx) ((uint32_t)((op) << 24) | ((a) << 16) | (((sbx) + 32768) & 0xFFFF))
+#define ZEN_SBX(i) ((int)((int)((i) & 0xFFFF) - 32768))
+
+} /* namespace zen */
+
+#endif /* ZEN_OPCODES_H */

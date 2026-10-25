@@ -1,0 +1,307 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "Node3D",
+    "name": "MuzzleFlash",
+    "properties": {
+      "script": "Assets/Scripts/muzzle_flash.py"
+    },
+    "children": [
+      {
+        "class": "ParticleSystem3D",
+        "name": "SideA",
+        "properties": {
+          "texture": "Assets/Textures/Fx/muzzle_side_a.png",
+          "blend_mode": 1,
+          "align": 1,
+          "max_particles": 4,
+          "emission_mode": 0,
+          "emission_rate": 0.0,
+          "emission_direction": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "emission_spread_angle": 0.0,
+          "particle_lifetime_min": 0.05,
+          "particle_lifetime_max": 0.06,
+          "particle_speed_min": 0.01,
+          "particle_speed_max": 0.01,
+          "particle_size_start": [
+            0.1,
+            0.22
+          ],
+          "particle_size_end": [
+            0.13,
+            0.28
+          ],
+          "particle_color_start": [
+            1,
+            0.9,
+            0.75,
+            1
+          ],
+          "particle_color_end": [
+            1,
+            0.5,
+            0.2,
+            0
+          ],
+          "gravity": [
+            0,
+            0,
+            0
+          ],
+          "drag": 0.0,
+          "shape_type": 0,
+          "position": [
+            0.11,
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "class": "ParticleSystem3D",
+        "name": "SideB",
+        "properties": {
+          "texture": "Assets/Textures/Fx/muzzle_side_b.png",
+          "blend_mode": 1,
+          "align": 1,
+          "max_particles": 4,
+          "emission_mode": 0,
+          "emission_rate": 0.0,
+          "emission_direction": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "emission_spread_angle": 0.0,
+          "particle_lifetime_min": 0.05,
+          "particle_lifetime_max": 0.06,
+          "particle_speed_min": 0.01,
+          "particle_speed_max": 0.01,
+          "particle_size_start": [
+            0.1,
+            0.22
+          ],
+          "particle_size_end": [
+            0.13,
+            0.28
+          ],
+          "particle_color_start": [
+            1,
+            0.9,
+            0.75,
+            1
+          ],
+          "particle_color_end": [
+            1,
+            0.5,
+            0.2,
+            0
+          ],
+          "gravity": [
+            0,
+            0,
+            0
+          ],
+          "drag": 0.0,
+          "shape_type": 0,
+          "position": [
+            0.11,
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "class": "ParticleSystem3D",
+        "name": "Star",
+        "properties": {
+          "texture": "Assets/Textures/Fx/muzzle_star.png",
+          "blend_mode": 1,
+          "align": 0,
+          "max_particles": 4,
+          "emission_mode": 0,
+          "emission_rate": 0.0,
+          "emission_direction": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "emission_spread_angle": 0.0,
+          "particle_lifetime_min": 0.04,
+          "particle_lifetime_max": 0.05,
+          "particle_speed_min": 0.01,
+          "particle_speed_max": 0.01,
+          "particle_size_start": [
+            0.16,
+            0.16
+          ],
+          "particle_size_end": [
+            0.2,
+            0.2
+          ],
+          "particle_color_start": [
+            1,
+            0.85,
+            0.6,
+            1
+          ],
+          "particle_color_end": [
+            1,
+            0.4,
+            0.1,
+            0
+          ],
+          "gravity": [
+            0,
+            0,
+            0
+          ],
+          "drag": 0.0,
+          "shape_type": 0,
+          "position": [
+            0.02,
+            0,
+            0
+          ],
+          "particle_rotation_speed_min": -40.0,
+          "particle_rotation_speed_max": 40.0
+        }
+      },
+      {
+        "class": "ParticleSystem3D",
+        "name": "Glow",
+        "properties": {
+          "texture": "Assets/Textures/Fx/muzzle_glow.png",
+          "blend_mode": 1,
+          "align": 0,
+          "max_particles": 4,
+          "emission_mode": 0,
+          "emission_rate": 0.0,
+          "emission_direction": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "emission_spread_angle": 0.0,
+          "particle_lifetime_min": 0.06,
+          "particle_lifetime_max": 0.07,
+          "particle_speed_min": 0.01,
+          "particle_speed_max": 0.01,
+          "particle_size_start": [
+            0.45,
+            0.45
+          ],
+          "particle_size_end": [
+            0.5,
+            0.5
+          ],
+          "particle_color_start": [
+            1,
+            0.7,
+            0.4,
+            0.6
+          ],
+          "particle_color_end": [
+            1,
+            0.4,
+            0.1,
+            0
+          ],
+          "gravity": [
+            0,
+            0,
+            0
+          ],
+          "drag": 0.0,
+          "shape_type": 0,
+          "position": [
+            0.05,
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "class": "ParticleSystem3D",
+        "name": "Smoke",
+        "properties": {
+          "texture": "Assets/Textures/Fx/smoke.png",
+          "blend_mode": 0,
+          "align": 0,
+          "max_particles": 4,
+          "emission_mode": 0,
+          "emission_rate": 0.0,
+          "emission_direction": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "emission_spread_angle": 25.0,
+          "particle_lifetime_min": 0.5,
+          "particle_lifetime_max": 0.9,
+          "particle_speed_min": 0.15,
+          "particle_speed_max": 0.4,
+          "particle_size_start": [
+            0.05,
+            0.05
+          ],
+          "particle_size_end": [
+            0.3,
+            0.3
+          ],
+          "particle_color_start": [
+            0.6,
+            0.6,
+            0.6,
+            0.25
+          ],
+          "particle_color_end": [
+            0.5,
+            0.5,
+            0.5,
+            0
+          ],
+          "gravity": [
+            0,
+            0.25,
+            0
+          ],
+          "drag": 1.5,
+          "shape_type": 0,
+          "position": [
+            0.05,
+            0,
+            0
+          ],
+          "particle_rotation_speed_min": -1.0,
+          "particle_rotation_speed_max": 1.0
+        }
+      },
+      {
+        "class": "OmniLight3D",
+        "name": "Light",
+        "properties": {
+          "position": [
+            0.1,
+            0,
+            0
+          ],
+          "light_color": [
+            1.0,
+            0.72,
+            0.4,
+            1.0
+          ],
+          "light_energy": 0.0,
+          "omni_range": 4.0,
+          "shadow_enabled": false
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+schema_version = "1.0.0"
+
+id = "io_prisma3d"
+version = "1.0.0"
+name = "prisma3d formats"
+tagline = "Import and export prisma3d meshes, skeletons, clips, materials"
+maintainer = "akadjoker"
+type = "add-on"
+
+blender_version_min = "4.2.0"
+
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+
+[permissions]
+files = "Read and write the model, animation, material and texture files"

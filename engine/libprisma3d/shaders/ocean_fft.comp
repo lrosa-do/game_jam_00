@@ -1,0 +1,146 @@
+#version 450
+
+layout(local_size_x = 128, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std140) uniform FftParams
+{
+	uvec4 strides;
+	vec4 phase;
+}
+fft;
+
+#define thread_count fft.strides.x
+#define ostride fft.strides.y
+#define istride fft.strides.z
+#define pstride fft.strides.w
+#define phase_base fft.phase.x
+
+layout(set = 2, binding = 0, std430) buffer restrict readonly SrcData
+{
+	vec2 data[];
+}
+g_SrcData;
+
+layout(set = 2, binding = 1, std430) buffer restrict writeonly DstData
+{
+	vec2 data[];
+}
+g_DstData;
+
+#define COS_PI_4_16 0.70710678118654752440084436210485
+
+void FT2(inout vec2 a, inout vec2 b)
+{
+	float t;
+
+	t = a.x;
+	a.x += b.x;
+	b.x = t - b.x;
+
+	t = a.y;
+	a.y += b.y;
+	b.y = t - b.y;
+}
+
+void CMUL_forward(inout vec2 a, float bx, float by)
+{
+	float t = a.x;
+	a.x = t * bx - a.y * by;
+	a.y = t * by + a.y * bx;
+}
+
+void UPD_forward(inout vec2 a, inout vec2 b)
+{
+	float A = a.x;
+	float B = b.y;
+
+	a.x += b.y;
+	b.y = a.y + b.x;
+	a.y -= b.x;
+	b.x = A - B;
+}
+
+void FFT_forward_4(inout vec2 D[8])
+{
+	FT2(D[0], D[2]);
+	FT2(D[1], D[3]);
+	FT2(D[0], D[1]);
+
+	UPD_forward(D[2], D[3]);
+}
+
+void FFT_forward_8(inout vec2 D[8])
+{
+	FT2(D[0], D[4]);
+	FT2(D[1], D[5]);
+	FT2(D[2], D[6]);
+	FT2(D[3], D[7]);
+
+	UPD_forward(D[4], D[6]);
+	UPD_forward(D[5], D[7]);
+
+	CMUL_forward(D[5], COS_PI_4_16, -COS_PI_4_16);
+	CMUL_forward(D[7], -COS_PI_4_16, -COS_PI_4_16);
+
+	FFT_forward_4(D);
+	FT2(D[4], D[5]);
+	FT2(D[6], D[7]);
+}
+
+void TWIDDLE(inout vec2 d, float phase)
+{
+	float tx = cos(phase);
+	float ty = sin(phase);
+	float t = d.x;
+	d.x = t * tx - d.y * ty;
+	d.y = t * ty + d.y * tx;
+}
+
+void TWIDDLE_8(inout vec2 D[8], float phase)
+{
+	TWIDDLE(D[4], 1.0 * phase);
+	TWIDDLE(D[2], 2.0 * phase);
+	TWIDDLE(D[6], 3.0 * phase);
+	TWIDDLE(D[1], 4.0 * phase);
+	TWIDDLE(D[5], 5.0 * phase);
+	TWIDDLE(D[3], 6.0 * phase);
+	TWIDDLE(D[7], 7.0 * phase);
+}
+
+void main()
+{
+	uvec3 thread_id = gl_GlobalInvocationID;
+	if (thread_id.x >= thread_count)
+		return;
+
+	vec2 D[8];
+
+#ifndef FFT_V2
+	uint imod = thread_id.x & (istride - 1u);
+	uint iaddr = ((thread_id.x - imod) << 3u) + imod;
+	for (uint i = 0u; i < 8u; i++)
+		D[i] = g_SrcData.data[iaddr + i * istride];
+
+	FFT_forward_8(D);
+	uint p = thread_id.x & (istride - pstride);
+	float phase = phase_base * float(p);
+	TWIDDLE_8(D, phase);
+#else
+	uint iaddr = thread_id.x << 3u;
+	for (uint i = 0u; i < 8u; i++)
+		D[i] = g_SrcData.data[iaddr + i];
+
+	FFT_forward_8(D);
+#endif
+
+	uint omod = thread_id.x & (ostride - 1u);
+	uint oaddr = ((thread_id.x - omod) << 3u) + omod;
+	g_DstData.data[oaddr + 0u * ostride] = D[0];
+	g_DstData.data[oaddr + 1u * ostride] = D[4];
+	g_DstData.data[oaddr + 2u * ostride] = D[2];
+	g_DstData.data[oaddr + 3u * ostride] = D[6];
+	g_DstData.data[oaddr + 4u * ostride] = D[1];
+	g_DstData.data[oaddr + 5u * ostride] = D[5];
+	g_DstData.data[oaddr + 6u * ostride] = D[3];
+	g_DstData.data[oaddr + 7u * ostride] = D[7];
+}

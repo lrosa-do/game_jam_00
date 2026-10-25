@@ -1,0 +1,44 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "Node3D",
+    "name": "Boom",
+    "properties": {
+      "script": "Assets/Scripts/boom.py"
+    },
+    "children": [
+      {
+        "class": "OmniLight3D",
+        "name": "Flash",
+        "properties": {
+          "position": [
+            0,
+            1.0,
+            0
+          ],
+          "light_color": [
+            1.0,
+            0.6,
+            0.25,
+            1.0
+          ],
+          "light_energy": 0.0,
+          "omni_range": 14.0,
+          "shadow_enabled": false
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Sound",
+        "properties": {
+          "stream": "Assets/Sounds/explosion/car_a.wav",
+          "attenuation_model": 1,
+          "max_distance": 80.0,
+          "unit_size": 10.0,
+          "volume_linear": 1.0
+        }
+      }
+    ]
+  }
+}

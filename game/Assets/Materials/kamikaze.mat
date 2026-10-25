@@ -1,0 +1,24 @@
+# Robot skins of the wired men; the glow map lights up only the face painted on the bomb.
+material "police" {
+    albedo           = "Assets/Textures/Kamikaze/police.jpg"
+    normal           = "Assets/Textures/Kamikaze/police_normal.png"
+    normal_scale     = 1.0
+    roughness_map    = "Assets/Textures/Kamikaze/police_rough.jpg"
+    emission         = "Assets/Textures/Kamikaze/police_glow.png"
+    emission_color   = (0, 0, 0)
+    emission_energy  = 2.5
+    metallic         = 0.15
+    roughness        = 1.0
+}
+
+material "robot" {
+    albedo           = "Assets/Textures/Kamikaze/robot.jpg"
+    normal           = "Assets/Textures/Kamikaze/robot_normal.png"
+    normal_scale     = 1.0
+    roughness_map    = "Assets/Textures/Kamikaze/robot_rough.jpg"
+    emission         = "Assets/Textures/Kamikaze/robot_glow.png"
+    emission_color   = (0, 0, 0)
+    emission_energy  = 2.5
+    metallic         = 0.15
+    roughness        = 1.0
+}

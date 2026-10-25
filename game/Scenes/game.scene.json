@@ -1,0 +1,882 @@
+{
+ "format": "prisma3d-scene",
+ "version": 1,
+ "root": {
+  "class": "Node3D",
+  "name": "Game",
+  "properties": {
+   "script": "Assets/Scripts/game.py"
+  },
+  "groups": [
+   "game"
+  ],
+  "children": [
+   {
+    "instance": "Assets/Levels/esquadra_policia.glb?physics=concave&lightmap=4",
+    "name": "Level"
+   },
+   {
+    "class": "WorldEnvironment",
+    "name": "Environment",
+    "properties": {
+     "background_mode": 2,
+     "sky_top_color": [
+      0.012,
+      0.018,
+      0.04,
+      1.0
+     ],
+     "sky_horizon_color": [
+      0.17,
+      0.11,
+      0.08,
+      1.0
+     ],
+     "sky_curve": 0.12,
+     "sky_ground_bottom_color": [
+      0.02,
+      0.02,
+      0.025,
+      1.0
+     ],
+     "sky_ground_horizon_color": [
+      0.17,
+      0.11,
+      0.08,
+      1.0
+     ],
+     "sky_ground_curve": 0.05,
+     "sky_sun_angle_max": 0.0,
+     "glow_enabled": true,
+     "glow_intensity": 0.7,
+     "glow_bloom": 0.04,
+     "glow_hdr_threshold": 0.9,
+     "tonemap_mode": 3,
+     "tonemap_exposure": 1.05,
+     "tonemap_white": 1.0,
+     "adjustment_enabled": true,
+     "adjustment_brightness": 1.0,
+     "adjustment_contrast": 1.08,
+     "adjustment_saturation": 0.85
+    }
+   },
+   {
+    "class": "Node3D",
+    "name": "PlayerStart",
+    "properties": {
+     "position": [
+      8.0,
+      -3.6,
+      85.0
+     ],
+     "rotation": [
+      0.0,
+      1.5708,
+      0.0
+     ]
+    }
+   },
+   {
+    "class": "Node3D",
+    "name": "Lights",
+    "children": [
+     {
+      "class": "SpotLight3D",
+      "name": "briefing_lamp16_0",
+      "properties": {
+       "position": [
+        5.53,
+        -1.08,
+        -12.75
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.86,
+        0.66,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 8.0,
+       "spot_angle": 65.0
+      }
+     },
+     {
+      "class": "SpotLight3D",
+      "name": "cells_lamp05_1",
+      "properties": {
+       "position": [
+        -6.5,
+        -5.58,
+        -4.5
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.95,
+        0.85,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 8.0,
+       "spot_angle": 65.0
+      }
+     },
+     {
+      "class": "SpotLight3D",
+      "name": "cells02_lamp05_2",
+      "properties": {
+       "position": [
+        -5.11,
+        -7.0,
+        -14.86
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.95,
+        0.85,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 8.0,
+       "spot_angle": 65.0
+      }
+     },
+     {
+      "class": "SpotLight3D",
+      "name": "cells04_lamp05_3",
+      "properties": {
+       "position": [
+        -11.38,
+        -5.58,
+        -12.81
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.95,
+        0.85,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 8.0,
+       "spot_angle": 65.0
+      }
+     },
+     {
+      "class": "SpotLight3D",
+      "name": "entrance_to_cells_lamp05_4",
+      "properties": {
+       "position": [
+        6.06,
+        -5.6,
+        -17.52
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.95,
+        0.85,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 8.0,
+       "spot_angle": 65.0
+      }
+     },
+     {
+      "class": "SpotLight3D",
+      "name": "garage_lamp05_5",
+      "properties": {
+       "position": [
+        -18.0,
+        -6.19,
+        34.0
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.95,
+        0.85,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 8.0,
+       "spot_angle": 65.0
+      }
+     },
+     {
+      "class": "SpotLight3D",
+      "name": "gents_lamp05_6",
+      "properties": {
+       "position": [
+        -8.5,
+        -0.58,
+        -18.0
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.95,
+        0.85,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 7.0,
+       "spot_angle": 65.0
+      }
+     },
+     {
+      "class": "SpotLight3D",
+      "name": "interrogation01_lamp16_7",
+      "properties": {
+       "position": [
+        -2.5,
+        3.92,
+        6.28
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.86,
+        0.66,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 8.0,
+       "spot_angle": 65.0
+      }
+     },
+     {
+      "class": "SpotLight3D",
+      "name": "ladies_lamp05_8",
+      "properties": {
+       "position": [
+        -5.5,
+        -0.58,
+        -17.5
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.95,
+        0.85,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 7.0,
+       "spot_angle": 65.0
+      }
+     },
+     {
+      "class": "SpotLight3D",
+      "name": "rec_room_lamp16_9",
+      "properties": {
+       "position": [
+        1.5,
+        3.88,
+        7.59
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.86,
+        0.66,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 7.9,
+       "spot_angle": 65.0
+      }
+     },
+     {
+      "class": "SpotLight3D",
+      "name": "reception_lamp16_10",
+      "properties": {
+       "position": [
+        -1.34,
+        -1.12,
+        -5.0
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.86,
+        0.66,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 8.0,
+       "spot_angle": 65.0
+      }
+     },
+     {
+      "class": "SpotLight3D",
+      "name": "staircase_lamp16_11",
+      "properties": {
+       "position": [
+        4.62,
+        -1.12,
+        0.53
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.86,
+        0.66,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 8.0,
+       "spot_angle": 65.0
+      }
+     },
+     {
+      "class": "SpotLight3D",
+      "name": "stairs_to_lockup_lamp05_12",
+      "properties": {
+       "position": [
+        7.8,
+        -6.63,
+        -1.13
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.95,
+        0.85,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 8.0,
+       "spot_angle": 65.0
+      }
+     },
+     {
+      "class": "SpotLight3D",
+      "name": "startroom_lamp16_13",
+      "properties": {
+       "position": [
+        -0.09,
+        3.88,
+        -11.19
+       ],
+       "rotation": [
+        -1.5708,
+        0.0,
+        0.0
+       ],
+       "light_color": [
+        1.0,
+        0.86,
+        0.66,
+        1.0
+       ],
+       "light_energy": 1.2,
+       "shadow_opacity": 0.85,
+       "spot_range": 8.0,
+       "spot_angle": 65.0
+      }
+     }
+    ]
+   },
+   {
+    "instance": "Assets/Prefabs/player.scene.json",
+    "name": "Player",
+    "properties": {
+     "position": [
+      8.0,
+      -3.6,
+      85.0
+     ],
+     "rotation": [
+      0.0,
+      1.5708,
+      0.0
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/unit7.scene.json",
+    "name": "Unit7",
+    "properties": {
+     "position": [
+      -7.907283,
+      -7.9,
+      0.55003864
+     ],
+     "rotation": [
+      0.0,
+      1.4668466,
+      0.0
+     ],
+     "scale": [
+      0.99999976,
+      1.0,
+      0.99999976
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/prisoner.scene.json",
+    "name": "Prisoner",
+    "properties": {
+     "position": [
+      -15.131892,
+      -9.0,
+      -20.919271
+     ],
+     "rotation": [
+      3.1415927,
+      1.4567792,
+      3.1415927
+     ],
+     "scale": [
+      0.99999994,
+      0.99999994,
+      0.99999994
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/towel.scene.json",
+    "name": "Towel",
+    "properties": {
+     "position": [
+      -5.459905,
+      -4.0,
+      -19.0
+     ],
+     "rotation": [
+      3.1415927,
+      -8.742278e-08,
+      3.1415927
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/kamikaze.scene.json",
+    "name": "Sleeper_1",
+    "properties": {
+     "position": [
+      -24.0,
+      -9.1,
+      43.25215
+     ],
+     "rotation": [
+      0.0,
+      0.5235989,
+      0.0
+     ],
+     "pose": "back"
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/kamikaze.scene.json",
+    "name": "Sleeper_2",
+    "properties": {
+     "position": [
+      -16.509869,
+      -9.1,
+      26.748407
+     ],
+     "rotation": [
+      3.1415927,
+      -0.349066,
+      3.1415927
+     ],
+     "scale": [
+      0.9999999,
+      1.0,
+      0.9999999
+     ],
+     "pose": "front"
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/cop_a.scene.json",
+    "name": "Cop1",
+    "properties": {
+     "position": [
+      -0.9,
+      1.0,
+      -14.5
+     ],
+     "rotation": [
+      0.0,
+      3.1415927,
+      0.0
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/cop_b.scene.json",
+    "name": "Cop2",
+    "properties": {
+     "position": [
+      4.0,
+      1.0,
+      -12.0
+     ],
+     "rotation": [
+      0.0,
+      2.3,
+      0.0
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/security.scene.json",
+    "name": "Cop3",
+    "properties": {
+     "position": [
+      -6.0,
+      1.0,
+      -3.0
+     ],
+     "rotation": [
+      0.0,
+      -1.2,
+      0.0
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/cop_female.scene.json",
+    "name": "Cop4",
+    "properties": {
+     "position": [
+      -5.5,
+      1.0,
+      4.0
+     ],
+     "rotation": [
+      0.0,
+      1.5708,
+      0.0
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/cop_a.scene.json",
+    "name": "Cop5",
+    "properties": {
+     "position": [
+      3.5,
+      1.0,
+      7.0
+     ],
+     "rotation": [
+      0.0,
+      3.1415927,
+      0.0
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/cop_b.scene.json",
+    "name": "Cop6",
+    "properties": {
+     "position": [
+      -14.3,
+      -9.0,
+      38.8
+     ],
+     "rotation": [
+      0.0,
+      3.14159,
+      0.0
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/security.scene.json",
+    "name": "Cop7",
+    "properties": {
+     "position": [
+      -10.9,
+      -9.0,
+      41.6
+     ],
+     "rotation": [
+      0.0,
+      2.6,
+      0.0
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/cop_a.scene.json",
+    "name": "Cop8",
+    "properties": {
+     "position": [
+      -2.0,
+      -4.0,
+      2.0
+     ],
+     "rotation": [
+      0.0,
+      2.4,
+      0.0
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/cop_female.scene.json",
+    "name": "Cop9",
+    "properties": {
+     "position": [
+      3.0,
+      -4.0,
+      -4.0
+     ],
+     "rotation": [
+      0.0,
+      3.0,
+      0.0
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/barrel.scene.json",
+    "name": "Barrel_1",
+    "properties": {
+     "position": [
+      -17.0,
+      -9.53,
+      36.0
+     ],
+     "rotation": [
+      0.0,
+      0.17453292,
+      0.0
+     ],
+     "scale": [
+      0.99999803,
+      1.0,
+      0.99999803
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/barrel.scene.json",
+    "name": "Barrel_2",
+    "properties": {
+     "position": [
+      -16.8,
+      -9.53,
+      37.2
+     ],
+     "rotation": [
+      0.0,
+      1.3089972,
+      0.0
+     ],
+     "scale": [
+      1.000001,
+      1.0,
+      1.000001
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/barrel.scene.json",
+    "name": "Barrel_3",
+    "properties": {
+     "position": [
+      -23.2,
+      -9.53,
+      34.5
+     ],
+     "rotation": [
+      3.1415927,
+      0.6981318,
+      3.1415927
+     ],
+     "scale": [
+      1.0000768,
+      1.0,
+      1.0000768
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/barrel.scene.json",
+    "name": "Barrel_4",
+    "properties": {
+     "position": [
+      -9.0,
+      -9.53,
+      45.0
+     ],
+     "rotation": [
+      0.0,
+      0.5235989,
+      0.0
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/barrel.scene.json",
+    "name": "Barrel_5",
+    "properties": {
+     "position": [
+      -9.7,
+      -9.53,
+      44.3
+     ],
+     "rotation": [
+      3.1415927,
+      -0.34906593,
+      3.1415927
+     ],
+     "scale": [
+      1.0009333,
+      1.0,
+      1.0009333
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/crate_small.scene.json",
+    "name": "Crate_1",
+    "properties": {
+     "position": [
+      -18.4,
+      -9.57,
+      35.2
+     ],
+     "rotation": [
+      0.0,
+      0.20943955,
+      0.0
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/crate_small.scene.json",
+    "name": "Crate_2",
+    "properties": {
+     "position": [
+      -18.5,
+      -9.57,
+      36.2
+     ],
+     "rotation": [
+      0.0,
+      -0.1396264,
+      0.0
+     ],
+     "scale": [
+      0.9999969,
+      1.0,
+      0.9999969
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/crate_small.scene.json",
+    "name": "Crate_3",
+    "properties": {
+     "position": [
+      -18.45,
+      -8.71,
+      35.7
+     ],
+     "rotation": [
+      0.0,
+      0.5235989,
+      0.0
+     ]
+    }
+   },
+   {
+    "instance": "Assets/Prefabs/crate_big.scene.json",
+    "name": "Crate_4",
+    "properties": {
+     "position": [
+      -22.0,
+      -9.14,
+      42.0
+     ],
+     "rotation": [
+      0.0,
+      0.26179942,
+      0.0
+     ],
+     "scale": [
+      0.9999997,
+      1.0,
+      0.9999997
+     ]
+    }
+   }
+  ]
+ }
+}

@@ -1,0 +1,43 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "RigidBody3D",
+    "name": "CrateBig",
+    "properties": {
+      "script": "Assets/Scripts/crate.py",
+      "mass": 250.0,
+      "health": 140.0,
+      "broken_model": "Assets/Models/Props/crate_big_broken.glb"
+    },
+    "groups": [
+      "blastable",
+      "damageable"
+    ],
+    "children": [
+      {
+        "class": "CollisionShape3D",
+        "name": "Shape",
+        "properties": {
+          "shape_type": 1,
+          "box_size": [
+            2.0661,
+            1.666,
+            1.2416
+          ]
+        }
+      },
+      {
+        "instance": "Assets/Models/Props/crate_big.glb",
+        "name": "Model",
+        "properties": {
+          "position": [
+            0.0,
+            -0.85,
+            0.0
+          ]
+        }
+      }
+    ]
+  }
+}

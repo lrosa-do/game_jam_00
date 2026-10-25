@@ -1,0 +1,77 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "Node3D",
+    "name": "Jet",
+    "properties": {
+      "script": "Assets/Scripts/fx_life.py",
+      "life": 5.0,
+      "stop_at": 3.0
+    },
+    "children": [
+      {
+        "class": "ParticleSystem3D",
+        "name": "Jet",
+        "properties": {
+          "blend_mode": 0,
+          "align": 0,
+          "max_particles": 120,
+          "emission_mode": 0,
+          "emission_rate": 45.0,
+          "emission_direction": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "emission_spread_angle": 8.0,
+          "gravity": [
+            0,
+            -9.8,
+            0
+          ],
+          "drag": 0.0,
+          "shape_type": 0,
+          "texture": "Assets/Textures/Fx/water_spray.png",
+          "particle_lifetime_min": 0.5,
+          "particle_lifetime_max": 0.9,
+          "particle_speed_min": 2.5,
+          "particle_speed_max": 4.0,
+          "particle_size_start": [
+            0.06,
+            0.06
+          ],
+          "particle_size_end": [
+            0.22,
+            0.22
+          ],
+          "particle_color_start": [
+            0.7,
+            0.85,
+            1.0,
+            0.7
+          ],
+          "particle_color_end": [
+            0.6,
+            0.8,
+            1.0,
+            0.0
+          ],
+          "particle_rotation_speed_min": -3.0,
+          "particle_rotation_speed_max": 3.0
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Sound",
+        "properties": {
+          "stream": "Assets/Sounds/break/water_hit.ogg",
+          "attenuation_model": 1,
+          "max_distance": 30.0,
+          "unit_size": 3.0,
+          "volume_linear": 0.9
+        }
+      }
+    ]
+  }
+}

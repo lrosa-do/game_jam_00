@@ -1,0 +1,44 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "Node3D",
+    "name": "Pickup",
+    "properties": {
+      "script": "Assets/Scripts/pickup.py",
+      "kind": "keycard",
+      "amount": 1,
+      "radius": 1.3
+    },
+    "children": [
+      {
+        "class": "MeshInstance3D",
+        "name": "Mesh",
+        "properties": {
+          "position": [0, 0.3, 0],
+          "mesh": "primitive:box?size=0.2,0.13,0.015",
+          "material_override": "Assets/Materials/pickups.mat::keycard"
+        }
+      },
+      {
+        "class": "MeshInstance3D",
+        "name": "Ring",
+        "properties": {
+          "position": [0, 0.02, 0],
+          "mesh": "primitive:torus?major_radius=0.3&minor_radius=0.015",
+          "material_override": "Assets/Materials/pickups.mat::ring_keycard"
+        }
+      },
+      {
+        "class": "OmniLight3D",
+        "name": "Glow",
+        "properties": {
+          "position": [0, 0.4, 0],
+          "light_color": [0.2, 1.0, 0.45, 1.0],
+          "light_energy": 1.2,
+          "omni_range": 2.0
+        }
+      }
+    ]
+  }
+}

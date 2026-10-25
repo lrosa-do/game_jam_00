@@ -1,0 +1,7 @@
+build*/
+bin/
+.vscode/
+imgui.ini
+*.user
+compile_commands.json
+__pycache__/

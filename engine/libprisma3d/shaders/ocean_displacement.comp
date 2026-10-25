@@ -1,0 +1,42 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std140) uniform OceanParams
+{
+	uvec4 dims;
+	uvec4 offsets;
+	vec4 values;
+}
+ocean;
+
+#define xOceanOutWidth ocean.dims.z
+#define xOceanOutHeight ocean.dims.w
+#define xOceanSecondFieldOffset ocean.offsets.x
+#define xOceanChoppyScale ocean.values.z
+
+layout(set = 2, binding = 0, std430) buffer restrict readonly InputDxyz
+{
+	vec2 data[];
+}
+g_InputDxyz;
+
+layout(rgba16f, set = 3, binding = 0) uniform restrict writeonly image2D output_image;
+
+void main()
+{
+	uvec3 DTid = gl_GlobalInvocationID;
+	if (DTid.x >= xOceanOutWidth || DTid.y >= xOceanOutHeight) return;
+	uint addr = xOceanOutWidth * DTid.y + DTid.x;
+
+	float sign_correction = ((DTid.x + DTid.y) & 1u) != 0u ? -1.0 : 1.0;
+
+	vec2 f0 = g_InputDxyz.data[addr];
+	float f1 = g_InputDxyz.data[addr + xOceanSecondFieldOffset].x;
+
+	float dz = f0.x * sign_correction;
+	float dx = f0.y * sign_correction * xOceanChoppyScale;
+	float dy = f1 * sign_correction * xOceanChoppyScale;
+
+	imageStore(output_image, ivec2(DTid.xy), vec4(dx, dy, dz, 1.0));
+}

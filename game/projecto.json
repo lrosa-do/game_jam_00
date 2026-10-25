@@ -1,0 +1,23 @@
+{
+  "format": "prisma3d-project",
+  "version": 1,
+  "name": "NULL PROTOCOL",
+  "assetRoot": "Assets",
+  "scenes": [
+    "Scenes/boot.scene.json",
+    "Scenes/main.scene.json",
+    "Scenes/anim_test.scene.json",
+    "Scenes/game.scene.json",
+    "Scenes/bullet_time.scene.json",
+    "Scenes/map_view.scene.json"
+  ],
+  "activeScene": "Scenes/game.scene.json",
+  "searchPaths": [],
+  "settings": {
+    "display/window/size/mode": 3,
+    "display/window/size/initial_position_type": 4,
+    "rendering/anti_aliasing/quality/screen_space_aa": 1,
+    "display/window/vsync/vsync_mode": 2,
+    "rendering/anti_aliasing/quality/msaa_3d": 2
+  }
+}

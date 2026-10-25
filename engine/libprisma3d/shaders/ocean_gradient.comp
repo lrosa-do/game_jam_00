@@ -1,0 +1,49 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std140) uniform OceanParams
+{
+	uvec4 dims;
+	uvec4 offsets;
+	vec4 values;
+}
+ocean;
+
+#define xOceanOutWidth ocean.dims.z
+#define xOceanOutHeight ocean.dims.w
+#define xOceanChoppyScale ocean.values.z
+#define xOceanGridLen ocean.values.w
+
+layout(set = 1, binding = 0) uniform sampler2D texture_displacementmap;
+
+layout(rgba16f, set = 3, binding = 0) uniform restrict writeonly image2D output_image;
+
+void main()
+{
+	uvec3 DTid = gl_GlobalInvocationID;
+	if (DTid.x >= xOceanOutWidth || DTid.y >= xOceanOutHeight) return;
+
+	vec2 one_texel = 1.0 / vec2(float(xOceanOutWidth), float(xOceanOutHeight));
+	vec2 uv = (vec2(DTid.xy) + 0.5) * one_texel;
+
+	vec2 tc_left = vec2(uv.x - one_texel.x, uv.y);
+	vec2 tc_right = vec2(uv.x + one_texel.x, uv.y);
+	vec2 tc_back = vec2(uv.x, uv.y - one_texel.y);
+	vec2 tc_front = vec2(uv.x, uv.y + one_texel.y);
+
+	vec3 displace_left = textureLod(texture_displacementmap, tc_left, 0.0).xyz;
+	vec3 displace_right = textureLod(texture_displacementmap, tc_right, 0.0).xyz;
+	vec3 displace_back = textureLod(texture_displacementmap, tc_back, 0.0).xyz;
+	vec3 displace_front = textureLod(texture_displacementmap, tc_front, 0.0).xyz;
+
+	vec2 gradient = vec2(-(displace_right.z - displace_left.z), -(displace_front.z - displace_back.z));
+
+	vec2 Dx = (displace_right.xy - displace_left.xy) * xOceanChoppyScale * xOceanGridLen;
+	vec2 Dy = (displace_front.xy - displace_back.xy) * xOceanChoppyScale * xOceanGridLen;
+	float J = (1.0 + Dx.x) * (1.0 + Dy.y) - Dx.y * Dy.x;
+
+	float fold = max(1.0 - J, 0.0);
+
+	imageStore(output_image, ivec2(DTid.xy), vec4(gradient, 0.0, fold));
+}

@@ -1,0 +1,273 @@
+#include <kinetix/core/Math.h>
+#include <kinetix/core/Types.h>
+#include <kinetix/core/Log.h>
+
+#include "WaypointNetwork.h"
+
+#include <float.h>
+
+#include <ct/vector.hpp>
+#include <kinetix/core/Algorithm.h>
+
+namespace kinetix::AI
+{
+
+WaypointNetwork::~WaypointNetwork()
+{
+    clearWaypoints();
+}
+
+bool WaypointNetwork::addWaypoint(Waypoint* waypoint)
+{
+    WaypointID id = waypoint->id();
+    if (mWaypoints.find(id) == nullptr)
+    {
+        mWaypoints[id] = waypoint;
+        return true;
+    }
+    return false;
+}
+
+bool WaypointNetwork::removeWaypoint(WaypointID waypointID)
+{
+    Waypoint** slot = mWaypoints.find(waypointID);
+    if (!slot)
+        return false;
+
+    delete *slot;
+    mWaypoints.erase(waypointID);
+    return true;
+}
+
+void WaypointNetwork::clearWaypoints()
+{
+    for (auto& entry : mWaypoints)
+        delete entry.value;
+    mWaypoints.clear();
+}
+
+Waypoint* WaypointNetwork::findWaypoint(WaypointID waypointID) const
+{
+    Waypoint* const* slot = mWaypoints.find(waypointID);
+    return slot ? *slot : nullptr;
+}
+
+bool WaypointNetwork::findPath(WaypointID fromWaypoint, WaypointID toWaypoint, Path& outPath) const
+{
+    if (fromWaypoint == toWaypoint)
+    {
+        outPath.clear();
+        outPath.push_back(fromWaypoint);
+        return true;
+    }
+    if (!findWaypoint(fromWaypoint) || !findWaypoint(toWaypoint))
+        return false;
+
+    // Per-search node pool; freed on every return path below.
+    struct AStarNode
+    {
+        WaypointID waypoint = 0;
+        AStarNode* parent = nullptr;
+        float f = 0.0f, g = 0.0f, h = 0.0f;
+        bool inOpen = false;
+        bool inClosed = false;
+    };
+
+    ct::Vector<AStarNode*> pool;
+    ct::HashMap<WaypointID, AStarNode*> nodeMap;
+    nodeMap.reserve(mWaypoints.size());
+
+    auto allocNode = [&](WaypointID id)
+    {
+        AStarNode* node = new AStarNode();
+        node->waypoint = id;
+        pool.push_back(node);
+        return node;
+    };
+
+    // Open list kept sorted descending by f so pop_back() yields the lowest f.
+    auto insertSorted = [](ct::Vector<AStarNode*>& list, AStarNode* node)
+    {
+        auto pos = kinetix::LowerBound(list.begin(), list.end(), node,
+                                    [](const AStarNode* a, const AStarNode* b)
+                                    {
+                                        return a->f > b->f;
+                                    });
+        list.insert(pos, node);
+    };
+
+    // The distance heuristic alone overestimates as soon as an edge is
+    // cheaper than its length, and an overestimating A* returns a costlier
+    // route than the one that exists.
+    const float heuristicScale = minimumCostModifier();
+
+    AStarNode* start = allocNode(fromWaypoint);
+    start->g = 0.0f;
+    start->h = goalEstimate(fromWaypoint, toWaypoint) * heuristicScale;
+    start->f = start->g + start->h;
+    start->inOpen = true;
+    nodeMap[fromWaypoint] = start;
+
+    ct::Vector<AStarNode*> open;
+    open.push_back(start);
+
+    while (!open.empty())
+    {
+        AStarNode* n = open.back();
+        open.pop_back();
+        n->inOpen = false;
+
+        if (n->waypoint == toWaypoint)
+        {
+            outPath.clear();
+            for (AStarNode* node = n; node != nullptr; node = node->parent)
+                outPath.push_front(node->waypoint);
+
+            for (AStarNode* p : pool)
+                delete p;
+            return true;
+        }
+
+        const Waypoint* nwp = findWaypoint(n->waypoint);
+        for (const NetworkEdge& edge : nwp->edges())
+        {
+            const Waypoint* dest = findWaypoint(edge.destination);
+            if (!dest || !edge.open)
+                continue;
+
+            float newg = n->g + nwp->costForEdge(edge, *this);
+
+            AStarNode** nodeSlot = nodeMap.find(edge.destination);
+            bool wasInMap = nodeSlot != nullptr;
+            AStarNode* node = wasInMap ? *nodeSlot : allocNode(edge.destination);
+            if (!wasInMap)
+                nodeMap[edge.destination] = node;
+
+            if (wasInMap && (node->inOpen || node->inClosed) && node->g <= newg)
+            {
+                continue;
+            }
+
+            node->parent = n;
+            node->g = newg;
+            node->h = goalEstimate(node->waypoint, toWaypoint) * heuristicScale;
+            node->f = node->g + node->h;
+
+            node->inClosed = false;
+
+            if (!node->inOpen)
+            {
+                node->inOpen = true;
+                insertSorted(open, node);
+            }
+            else
+            {
+                auto pos = kinetix::Find(open.begin(), open.end(), node);
+                if (pos != open.end())
+                    open.erase(pos);
+                insertSorted(open, node);
+            }
+        }
+
+        n->inClosed = true;
+    }
+
+    for (AStarNode* p : pool)
+        delete p;
+    return false;
+}
+
+bool WaypointNetwork::findPath(const Math::vec3& origin, const Math::vec3& destination,
+                               const WaypointVisibility& visibility, Path& outPath) const
+{
+    WaypointID closestToOrigin;
+    WaypointID closestToDestination;
+
+    if (!findClosestValidWaypoint(origin, visibility, closestToOrigin))
+        return false;
+    if (!findClosestValidWaypoint(destination, visibility, closestToDestination))
+        return false;
+
+    outPath.clear();
+
+    // Same waypoint for both ends: walk straight to the destination point.
+    if (closestToOrigin == closestToDestination)
+        return true;
+
+    return findPath(closestToOrigin, closestToDestination, outPath);
+}
+
+bool WaypointNetwork::extents(Math::vec3& minimum, Math::vec3& maximum) const
+{
+    if (mWaypoints.empty())
+        return false;
+
+    Math::vec3 min(FLT_MAX);
+    Math::vec3 max(-FLT_MAX);
+    for (const auto& entry : mWaypoints)
+    {
+        const Waypoint* wp = entry.value;
+        const Math::vec3 radius(wp->radius());
+        min = Math::min(min, wp->position() - radius);
+        max = Math::max(max, wp->position() + radius);
+    }
+    minimum = min;
+    maximum = max;
+    return true;
+}
+
+bool WaypointNetwork::findClosestValidWaypoint(const Math::vec3& origin,
+                                               const WaypointVisibility& visibility,
+                                               WaypointID& outWaypointID) const
+{
+    float closestDistanceSq = FLT_MAX;
+    bool foundClosest = false;
+
+    for (const auto& entry : mWaypoints)
+    {
+        const Waypoint* wp = entry.value;
+        if (wp && visibility.isVisible(origin, wp->position()))
+        {
+            Math::vec3 delta = origin - wp->position();
+            float distSq = Math::dot(delta, delta);
+            if (distSq < closestDistanceSq)
+            {
+                closestDistanceSq = distSq;
+                outWaypointID = wp->id();
+                foundClosest = true;
+            }
+        }
+    }
+    return foundClosest;
+}
+
+float WaypointNetwork::minimumCostModifier() const
+{
+    float minimum = 1.0f;
+    bool any = false;
+    for (const auto& entry : mWaypoints)
+    {
+        if (!entry.value)
+            continue;
+        for (const NetworkEdge& edge : entry.value->edges())
+        {
+            if (!edge.open || edge.costModifier != edge.costModifier)
+                continue;
+            const float modifier = edge.costModifier > 0.0f ? edge.costModifier : 0.0f;
+            minimum = any ? kinetix::Min(minimum, modifier) : modifier;
+            any = true;
+        }
+    }
+    return minimum;
+}
+
+float WaypointNetwork::goalEstimate(WaypointID fromWaypoint, WaypointID toWaypoint) const
+{
+    const Waypoint* fromwp = findWaypoint(fromWaypoint);
+    const Waypoint* towp = findWaypoint(toWaypoint);
+    if (!fromwp || !towp)
+        return 0.0f;
+    return Math::length(fromwp->position() - towp->position());
+}
+
+}

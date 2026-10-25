@@ -1,0 +1,677 @@
+#ifndef ZEN_COMPILER_H
+#define ZEN_COMPILER_H
+
+#include "lexer.h"
+#include "emitter.h"
+#include "object.h"
+#include "vm.h"
+
+namespace zen
+{
+
+    /* =========================================================
+    ** Compiler — Single-pass, recursive descent, register-based.
+    **
+    ** Philosophy:
+    **   - ALL name resolution happens at compile time
+    **   - Locals → register index (zero-cost at runtime)
+    **   - Globals → global table index (OP_GETGLOBAL/OP_SETGLOBAL with Bx)
+    **   - Upvalues → upvalue array index (OP_GETUPVAL/OP_SETUPVAL)
+    **   - Fields → field index when class is known (OP_GETFIELD_IDX)
+    **   - Methods → vtable slot (OP_INVOKE_VT, O(1) dispatch)
+    **   - Constants → pool index (OP_LOADK with Bx)
+    **
+    ** The VM does ZERO string lookups at runtime.
+    **
+    ** Structure:
+    **   compile() → top-level, produces ObjFunc* (the script body)
+    **   declaration() → def, class, or statement
+    **   statement() → if/while/for/return/break/continue/pass/print/expr
+    **   expression() → Pratt parser with precedence climbing
+    **
+    ** Blocks: COLON + INDENT ... DEDENT (Python style)
+    ** ========================================================= */
+
+    /* =========================================================
+    ** Operator precedence levels (low to high, Python order)
+    ** ========================================================= */
+
+    enum Precedence
+    {
+        PREC_NONE = 0,
+        PREC_ASSIGNMENT,    /* = += -= etc */
+        PREC_TERNARY,       /* x if cond else y */
+        PREC_OR,            /* or */
+        PREC_AND,           /* and */
+        PREC_NOT,           /* not (unary) */
+        PREC_COMPARISON,    /* == != < > <= >= is in */
+        PREC_BITOR,         /* | */
+        PREC_BITXOR,        /* ^ */
+        PREC_BITAND,        /* & */
+        PREC_SHIFT,         /* << >> */
+        PREC_TERM,          /* + - */
+        PREC_FACTOR,        /* * / % // */
+        PREC_UNARY,         /* - ~ not */
+        PREC_POWER,         /* ** */
+        PREC_CALL,          /* () [] . */
+        PREC_PRIMARY,
+    };
+
+    /* Maximum constants/locals/upvalues per function */
+    static const int kMaxLocals = 200;
+    static const int kMaxUpvalues = 200;
+    static const int kMaxRegisters = 250;
+
+    /* =========================================================
+    ** Local variable (compile-time only, not stored at runtime)
+    ** ========================================================= */
+
+    struct Local
+    {
+        Token name;
+        int depth;      /* scope depth (0 = function body) */
+        int reg;        /* which register holds this local */
+        bool captured;  /* true if captured by a closure */
+        bool is_const;  /* true if declared with 'const' */
+        /* Type hint: `param: TypeName` — used for OP_GETFIELD_IDX */
+        bool has_type_hint;
+        Token type_hint; /* type name token (if has_type_hint) */
+        /* The hint came from `name = ClassName(...)` rather than from an
+        ** annotation: any other assignment drops it again, and the value
+        ** is an instance of exactly ClassName, never of a subclass. */
+        bool type_inferred;
+        bool type_exact;
+        /* `Array[Type]`: the array itself remains dynamic, but an indexed
+        ** element has this statically declared class. */
+        bool has_array_element_type;
+        Token array_element_type;
+    };
+
+    /* =========================================================
+    ** Upvalue descriptor (compile-time, copied to ObjFunc)
+    ** ========================================================= */
+
+    struct Upvalue
+    {
+        int index;      /* local reg in parent, or upvalue index in grandparent */
+        bool is_local;  /* true = from parent's locals, false = from parent's upvalues */
+    };
+
+    /* =========================================================
+    ** Loop tracking (for break/continue)
+    ** ========================================================= */
+
+    struct LoopInfo
+    {
+        int start_offset;   /* bytecode offset of loop condition */
+        int scope_depth;    /* scope depth at loop entry */
+        int breaks[64];     /* patch offsets for break jumps */
+        int break_count;
+        /* A numeric for's step instruction sits after the body, so its
+        ** `continue` is a forward jump patched once the body is done. */
+        bool continue_forward;
+        int continues[64];
+        int continue_count;
+    };
+
+    /* =========================================================
+    ** Call signature registry (compile-time only)
+    **
+    ** A pre-scan of the source records the parameter names of every
+    ** top-level `def` and of every method, so a call site can rewrite
+    **     f(a, b, flag=True)
+    ** into the plain positional call the VM already knows how to run.
+    ** Nothing here survives compilation: no bytecode, no ObjFunc field,
+    ** no branch in the dispatch loop.
+    ** ========================================================= */
+
+    static const int kMaxSigParams = 64; /* the fill mask is a uint64_t */
+
+    struct SigParam
+    {
+        const char *name;    /* points into the source buffer */
+        int32_t name_len;
+        bool has_default;
+        bool default_negate; /* the literal was written as -N */
+        Token default_tok;   /* the literal itself, valid if has_default */
+    };
+
+    struct FuncSig
+    {
+        const char *owner; /* class name, nullptr for a free function */
+        int32_t owner_len;
+        const char *name;
+        int32_t name_len;
+        int32_t param_start; /* first slot in the shared parameter pool */
+        int32_t param_count;   /* VALUE params only — does NOT include generic_count */
+        int32_t generic_count; /* type params declared as def f<T,U>(...): 2. 0 = not generic. */
+        bool takes_keywords; /* false for *args, overloads, oversized lists */
+        /* The method hands back its receiver: declared `-> Self` (or
+        ** `-> OwnClass`), or every `return` in its body is `return self`
+        ** and so is the body's final statement. Lets `a.m().n()` keep the
+        ** receiver's static class across the chain. */
+        bool returns_self;
+    };
+
+    /* Class → parent, so `self.method()` can find a method the class
+    ** inherited rather than declared. */
+    struct SigClass
+    {
+        const char *name;
+        int32_t name_len;
+        const char *parent; /* nullptr if the class has no base */
+        int32_t parent_len;
+    };
+
+    /* =========================================================
+    ** CompilerState — one per function being compiled.
+    ** Forms a linked list (parent) for nested functions.
+    ** ========================================================= */
+
+    struct CompilerState
+    {
+        CompilerState *parent;      /* enclosing function (NULL for script) */
+        ObjFunc *function;          /* function being built */
+        Emitter emitter;            /* bytecode emitter */
+
+        /* Locals */
+        Local locals[kMaxLocals];
+        int local_count;
+        int scope_depth;
+
+        /* Registers */
+        int next_reg;               /* next free register */
+        int max_reg;                /* high-water mark */
+
+        /* Upvalues */
+        Upvalue upvalues[kMaxUpvalues];
+        int upvalue_count;
+
+        /* Loops (nested) */
+        static const int kMaxLoopNest = 16;
+        LoopInfo loops[kMaxLoopNest];
+        int loop_depth;
+
+        /* Global declarations: names marked with `global name` */
+        static const int kMaxGlobals = 64;
+        Token globals[kMaxGlobals];
+        int global_count;
+
+        /* Flags */
+        bool is_method;             /* inside a class method? (self in reg 0) */
+        bool eval_mode;             /* top-level: last expression becomes return value */
+        bool had_eval_return;       /* expression_statement emitted a return in eval mode */
+        bool is_generator;          /* function contains yield → mark as generator */
+    };
+
+    /* =========================================================
+    ** Compiler class
+    ** ========================================================= */
+
+    class Compiler
+    {
+    public:
+        ObjFunc *compile(GC *gc, VM *vm, const char *source, const char *filename);
+        ObjFunc *compile_eval(GC *gc, VM *vm, const char *source, const char *filename, bool silent = false);
+        bool had_error() const { return had_error_; }
+
+        /* --- Error capture (POD, no destructors) --- */
+        struct ErrorInfo { int line; int offset; };
+        static const int kMaxErrorInfos = 16;
+        static const int kErrorBufSize  = 4096;
+
+        int          error_info_count() const { return err_count_; }
+        int          error_line(int i)    const { return err_info_[i].line; }
+        const char*  error_message(int i) const { return err_buf_ + err_info_[i].offset; }
+        const char*  error_buffer()       const { return err_buf_; }
+
+    private:
+        /* --- Lexing interface --- */
+        void advance();
+        void consume(TokenType type, const char *msg);
+        bool check(TokenType type) const;
+        bool match(TokenType type);
+
+        /* --- Error handling --- */
+        void error(const char *msg);
+        /* Errors out when the function just compiled needed an operand the
+        ** 8-bit ABC fields cannot hold (more than 256 constants or registers). */
+        void check_operands();
+        void error_at_current(const char *msg);
+        void error_at(const Token &token, const char *msg);
+
+        /* --- Declarations --- */
+        void declaration();
+        void fun_declaration(bool force_async = false);
+        void param_type_hint(int param_reg);
+        void class_declaration();
+        void struct_declaration();
+        void enum_declaration();
+        void const_declaration();
+        void import_statement();
+        void using_statement();
+        void from_import_statement();
+
+        /* --- Statements --- */
+        void statement();
+        void if_statement();
+        void match_statement();
+        void while_statement();
+        void for_statement();
+        /* True when the tokens ahead are `range(` naming the builtin (no
+        ** local, `global`, def or class shadows it) with positional
+        ** arguments only — the shape for_statement lowers to FORPREP/FORLOOP. */
+        bool builtin_range_call_ahead();
+        void return_statement();
+        void break_statement();
+        void continue_statement();
+        void pass_statement();
+        void assert_statement();
+        void del_statement();
+        void print_statement();
+        void expression_statement();
+        void assignment_or_expr();
+
+        /* --- Block parsing --- */
+        void block();           /* consume INDENT, parse until DEDENT */
+        void colon_block();     /* consume ':', expect NEWLINE+INDENT, parse block */
+
+        /* --- Expressions (Pratt parser) --- */
+        int expression(int dest = -1);
+        int parse_precedence(int prec, int dest);
+        int parse_precedence_inner(int prec, int dest);
+        int prefix_rule(Token token, int dest);
+        /* Where an operand began, in both the token stream and the emitted
+        ** code — ternary_expr() rewinds to it to move `a` inside the branch
+        ** that actually wants it. */
+        struct OperandSnapshot
+        {
+            LexerState lex;
+            Token prev;
+            Token curr;
+            int code_offset;
+        };
+
+        int infix_rule(Token op, int left, int dest, const OperandSnapshot *snap);
+        int number(Token token, int dest);
+        int string_literal(Token token, int dest);
+        int fstring_literal(Token token, int dest);
+        int literal(Token token, int dest);
+        int variable(Token token, int dest, bool can_assign);
+        int unary(Token token, int dest);
+        int binary(Token op, int left, int dest);
+        int comparison(Token op, int left, int dest);
+        int logical_and(int left, int dest);
+        int logical_or(int left, int dest);
+        int ternary_expr(int true_val, int dest, const OperandSnapshot *snap);
+        /* True when current_ continues the same postfix chain (`.`, `(`,
+        ** `[`, `?.`) — see the definition in compiler_expressions.cpp for
+        ** why this lets a call adjourn its own move-into-dest to whichever
+        ** link in the chain turns out to be the last one. */
+        bool chain_continues() const;
+        /* True when the identifier about to be read is an uncaptured local
+        ** and the token after it is a binary operator, `.` or `[`: the
+        ** operator/access writes `dest` itself and may read the local in
+        ** place, so no copy into `dest` is needed first. */
+        bool local_operand_reads_in_place(const Token &name) const;
+        int call_expr(int callee, int dest);
+        int generic_call_expr(int callee, int dest);
+        int dot_expr(int obj, int dest, bool can_assign);
+        /* Where a field-assignment receiver was read from, so a store into a
+        ** value-type receiver (Vec2/Vec3 live in the register, not on the
+        ** heap) can be written back: `a.b.x = v` is `t = a.b; t.x = v;
+        ** a.b = t`. See capture_receiver_origin(). */
+        struct ReceiverOrigin
+        {
+            enum Kind : uint8_t { NONE, FIELD, FIELD_IDX, FIELD_IDXC, GLOBAL, UPVAL, INDEX };
+            Kind kind = NONE;
+            int parent = 0;  /* register the receiver was read from       */
+            int c = 0;       /* name constant / field index / index reg   */
+            int name_ki = 0; /* FIELD_IDXC: by-name fallback constant     */
+            int bx = 0;      /* GLOBAL: slot, UPVAL: upvalue index        */
+        };
+        void capture_receiver_origin(int obj, ReceiverOrigin &o) const;
+        void emit_receiver_writeback(const ReceiverOrigin &o, int obj, int line);
+        int safe_dot_expr(int obj, int dest);
+        int null_coalesce(int left, int dest);
+        int subscript_expr(int obj, int dest, bool can_assign);
+        int slice_expr(int obj, int dest, int start_reg);
+        int array_literal(int dest);
+        int map_literal(int dest);
+        int lambda_expr(int dest);
+        int yield_expr(int dest);
+        int await_expr(int dest);
+        int super_expr(int dest);
+
+        /* --- Argument list --- */
+        int argument_list(int base, int initial_nargs = 0, const FuncSig *sig = nullptr);
+        /* Parses <T,U>(args) after `base`. Type args land at R[base+1..],
+        ** value args right after them. Returns total register count
+        ** (ngeneric + nvalue, same convention as argument_list/OP_CALL);
+        ** *out_ngeneric receives the type-arg count alone so the caller can
+        ** emit it as the generic opcode's extra operand. */
+        int generic_argument_list(int base, const FuncSig *sig, int *out_ngeneric);
+        /* `callee_is_generic` must already be known true — either a script
+        ** FuncSig was resolved (callee_signature()/method_signature()) or a
+        ** native class method's generic_arity was found
+        ** (native_generic_method_arity()). False always returns false, no
+        ** lookahead performed. This is what keeps a plain variable followed
+        ** by `<X>(y)` from ever being read as a generic call: punctuation
+        ** alone cannot tell it apart from chained comparisons written
+        ** without spaces. */
+        bool generic_call_ahead(bool callee_is_generic);
+
+        /* --- Keyword arguments (compile-time, see FuncSig) --- */
+        void prescan_signatures(const char *source, const char *filename);
+        Token scan_signature(Lexer &scan, const char *owner, int owner_len,
+                             const Token &name);
+        bool sig_reserve(int extra_sigs, int extra_params);
+        void free_signatures();
+        const FuncSig *find_signature(const char *owner, int owner_len,
+                                      const char *name, int name_len) const;
+        const SigClass *find_sig_class(const char *name, int name_len) const;
+        const FuncSig *callee_signature();
+        const FuncSig *method_signature(int recv_reg, const Token &method) const;
+        const FuncSig *unique_method_signature(const Token &method) const;
+        const FuncSig *super_signature(const Token &method) const;
+        bool receiver_class(int reg, const char *&name, int32_t &len, bool *exact = nullptr) const;
+        /* Record a class annotation (`name: ClassName [= expr]`) so a later
+        ** obj.method<T>(...) on that variable can be recognised as a generic
+        ** call. Locals reuse Local::type_hint; globals get their own small
+        ** table since global slots carry no compile-time metadata otherwise.
+        ** This is annotation-only — there is no inference from `x = C()`
+        ** without the annotation, and no tracking of reassignment narrowing
+        ** the type away again (the hint is a promise the annotation makes,
+        ** same as any other type hint in this compiler). */
+        void set_local_type_hint(int reg, const Token &type_tok);
+        /* After a type name: consume an optional `?` or `| None`. The hint
+        ** stays a plain class hint — checked field/method forms already
+        ** fall back on a None receiver, so nullable adds nothing at run
+        ** time; the annotation is for the reader. */
+        void skip_nullable_suffix();
+        void set_global_type_hint(int gidx, const Token &type_tok);
+        void set_local_array_element_type(int reg, const Token &type_tok);
+        void set_global_array_element_type(int gidx, const Token &type_tok);
+        bool global_type_hint(int gidx, const char *&name, int32_t &len, bool *exact = nullptr) const;
+        bool array_element_class(int reg, const char *&name, int32_t &len) const;
+        /* receiver_class() plus the global-annotation table, via
+        ** pending_receiver_ — the one extra source of "the receiver's
+        ** static class name" a plain `obj.method(...)` dot_expr call has
+        ** available that receiver_class() alone (locals/self only) doesn't. */
+        bool receiver_static_class(int reg, const char *&name, int32_t &len, bool *exact = nullptr) const;
+        /* --- Class inference from constructor calls ---
+        ** `x = ClassName(...)` proves x's class as surely as an annotation
+        ** would, for as long as x is not assigned anything else. call_expr()
+        ** leaves the class of a bare, unshadowed constructor call in
+        ** last_expr_ctor_*; the assignment paths consume it through these. */
+        bool known_script_class(const Token &name) const;
+        void infer_assigned_class_local(int reg);
+        void infer_assigned_class_global(int gidx);
+        /* A global assigned from inside any function can change behind the
+        ** module code's back, so it is never inferred (and loses an
+        ** inferred class it already had). */
+        void note_global_written_in_function(int gidx);
+        const FuncSig *find_method_in_chain(const char *cls, int32_t cls_len, const Token &method) const;
+        /* Index of `fname` in the field layout of an already-compiled class
+        ** of this file (class_registry_), or -1. */
+        int registry_field_index(const char *cls, int32_t cls_len, ObjString *fname) const;
+        /* Is `fname` a native property (ClassBuilder::property) of class
+        ** `cls` or of an ancestor? Walks this file's script classes up to the
+        ** first class the VM already knows (an engine class) and asks it. */
+        bool native_property_of(const char *cls, int32_t cls_len, ObjString *fname) const;
+        /* `self.field = <expr>` in the class body: fold the expression's
+        ** class (a constructor call, None, or anything else) into the
+        ** field's guessed class. */
+        void note_field_class(int fidx, bool rhs_is_none);
+        /* The guessed class of field `fidx` of class `cls` (the one being
+        ** compiled or one in the registry), if it is known. */
+        bool field_class_guess(const char *cls, int32_t cls_len, int fidx, Token &out) const;
+        bool method_overridden_below(const char *cls, int32_t cls_len, const Token &method) const;
+        /* True if `cls_name.method` is a NATIVE class method registered via
+        ** ClassBuilder::generic_method() (never a script def — those go
+        ** through FuncSig/method_signature instead). On true, out_arity
+        ** receives ObjNative::generic_arity. Looks the class up as a VM
+        ** global by name, so it only sees classes def_class()'d before this
+        ** script compiles — the same ordering embedding code already
+        ** requires for a native class to be usable from script at all. */
+        bool native_generic_method_arity(const char *cls_name, int32_t cls_len,
+                                          const Token &method, int &out_arity) const;
+        int sig_param_index(const FuncSig *sig, const Token &name) const;
+        void emit_sig_default(const SigParam &p, int reg);
+        bool next_is_keyword_arg();
+
+        /* --- Name resolution (the core of compile-time work) --- */
+        int resolve_local(CompilerState *state, const Token &name);
+        int resolve_upvalue(CompilerState *state, const Token &name);
+        int add_upvalue(CompilerState *state, int index, bool is_local);
+
+        /* --- Variable declaration/assignment --- */
+        int declare_local(const Token &name);
+        int add_local(const Token &name);
+        int named_variable(const Token &name, int dest, bool can_assign);
+
+        /* --- Scope management --- */
+        void begin_scope();
+        void end_scope();
+        void close_captured_locals();
+        void store_to_lhs(const Token &name, int src_reg);
+
+        /* --- Register allocation --- */
+        int alloc_reg();
+        void free_reg(int reg);
+        void emit_move(int dst, int src);
+        bool is_local_reg(int reg) const;
+        /* `dst = <expr>` where the expression's value sits in temporary
+        ** `src`: instead of a MOVE, make the instruction that produced the
+        ** value write `dst` directly. Only when that instruction is the
+        ** single-word last one of a straight-line RHS (no branch can reach
+        ** past it with the value elsewhere) and is a pure producer that
+        ** reads its operands before writing A. Returns true if done. */
+        bool retarget_last_producer(int rhs_start, int jumps_before, int src, int dst);
+        /* Branch-on-condition for if/while: fuses a trailing LT/LE into the
+        ** two-word compare-and-jump. Returns the offset to patch; `fused`
+        ** says which patch routine to use. */
+        void comprehension_into(int reg, int kind, const LexerState &body_lex, Token body_cur, Token body_prev, int line);
+        int emit_cond_jump(int cond, bool &fused);
+        void patch_cond_jump(int offset, bool fused);
+        /* emit_cond_jump plus: a condition that is exactly `not x` branches
+        ** on x with the sense inverted (the NOT is dropped). Frees `reg`. */
+        int cond_false_jump(int reg, bool &fused);
+        /* The condition of if/elif/while. A plain expression: returns its
+        ** register and n == 0 — the caller branches on it. A top-level
+        ** `and`/`or` chain: compiled as jumps (no boolean is ever built, no
+        ** MOVE to unify the operands), returns -1; the fall-through is the
+        ** true path and jumps[0..n) must be patched to the false target. */
+        struct CondJump { int offset; bool fused; };
+        static const int kMaxCondJumps = 32;
+        int condition(CondJump *jumps, int &n);
+        void patch_cond_jumps(const CondJump *jumps, int n);
+
+        /* --- Global resolution (compile-time lookup) --- */
+        int require_global_slot(const char *name, int len);
+        int find_or_add_global(const char *name, int len);
+
+        /* --- Operator precedence --- */
+        int get_precedence(TokenType type) const;
+        bool is_right_associative(TokenType type) const;
+
+        /* --- Helpers --- */
+        bool identifiers_equal(const Token &a, const Token &b) const;
+        ObjString *token_string(const Token &t);
+        bool is_declared_global(const Token &name) const;
+
+        /* --- State --- */
+        GC *gc_;
+        VM *vm_;
+        Lexer lexer_;
+        Token current_;
+        Token previous_;
+        CompilerState *state_;  /* current function state */
+        bool had_error_;
+        bool panic_mode_;
+        /* Expression nesting depth — the recursive-descent parser otherwise
+        ** turns `((((...` into a C stack overflow. See parse_precedence. */
+        int expr_depth_ = 0;
+        bool silent_;          /* suppress error output (for try-compile) */
+        int error_count_;      /* number of reported compile errors */
+        bool abort_parse_;     /* stop parsing early after too many errors */
+        static const int kMaxCompileErrors = 12;
+        const char *current_file_;
+
+        /* Error capture buffer (POD) */
+        char      err_buf_[kErrorBufSize];
+        int       err_buf_used_;
+        ErrorInfo err_info_[kMaxErrorInfos];
+        int       err_count_;
+
+        /* Class compilation context */
+        Token current_class_;       /* name token of class being compiled */
+        Token current_class_parent_; /* parent class name token (if any) */
+        bool in_class_;             /* true while compiling a class body */
+        bool class_has_parent_;     /* true if current class has a parent */
+
+        /* Decorator context — filled by declaration() before fun/class */
+        static const int kMaxDecorators = 8;
+        int pending_decorator_regs_[kMaxDecorators];
+        int pending_decorator_count_;
+
+        /* Class field index table — built as we see self.field = ... in methods.
+        ** Enables OP_GETFIELD_IDX / OP_SETFIELD_IDX (O(1) field access).
+        ** Also used for params annotated with the current class type. */
+        static const int kMaxClassFields = 128;
+        static const int kMaxClasses = 32;
+
+        ObjString *class_field_table_[kMaxClassFields]; /* indexed by field order */
+        int class_field_count_;
+        /* Per field of the class being compiled: the class of the
+        ** constructor calls assigned to it (`self.left = Tree(...)`) when
+        ** every non-None assignment seen so far agreed. A hint only — its
+        ** users (OP_INVOKE_VT, OP_GETFIELD_IDXC) fall back when wrong. */
+        Token class_field_class_[kMaxClassFields];
+        uint8_t class_field_class_state_[kMaxClassFields]; /* 0 unknown, 1 inferred, 2 conflicting, 3 annotated */
+
+        /* Values a class body gave its fields ("class A:" then "speed = 5.0").
+        ** Held until the body closes so they can be emitted after the run of
+        ** OP_CLASSFIELD that registers the names. */
+        struct ClassFieldDefault
+        {
+            int field_index;
+            int const_index; /* slot in the enclosing function's constant pool */
+        };
+        ClassFieldDefault class_field_defaults_[kMaxClassFields];
+        int class_field_default_count_;
+
+        /* Per-class field registry — saved after each class is compiled.
+        ** Allows subclasses to inherit parent field indices. */
+        struct ClassFieldRegistry
+        {
+            Token name;
+            ObjString *fields[kMaxClassFields];
+            Token field_class[kMaxClassFields];
+            uint8_t field_class_state[kMaxClassFields];
+            int count;
+        };
+        ClassFieldRegistry class_registry_[kMaxClasses];
+        int class_registry_count_;
+
+        /* Global class-type annotations: `name: ClassName = ...` at global
+        ** scope. Small fixed table — this is a rare, deliberate annotation,
+        ** not something every global carries. See set_global_type_hint(). */
+        static const int kMaxGlobalTypeHints = 64;
+        struct GlobalTypeHint
+        {
+            int gidx;
+            Token type_tok;
+            bool has_class_type;
+            bool has_array_element_type;
+            Token array_element_type;
+            bool inferred; /* from `name = ClassName(...)`, see Local */
+            bool exact;
+        };
+        GlobalTypeHint global_type_hints_[kMaxGlobalTypeHints];
+        int global_type_hint_count_;
+
+        /* Signature registry, heap-allocated: the Compiler already carries
+        ** several kilobytes of fixed tables on the stack. Freed by compile(). */
+        FuncSig *sigs_;
+        int sig_count_;
+        int sig_cap_;
+        SigParam *sig_params_;
+        int sig_param_count_;
+        int sig_param_cap_;
+        SigClass *sig_classes_;
+        int sig_class_count_;
+        int sig_class_cap_;
+
+        /* The identifier a bare `name(...)` call was written with — set by
+        ** the Pratt loop, the only place that still knows it. */
+        Token pending_callee_;
+        bool pending_callee_valid_;
+
+        /* The identifier a bare `name.field` was written with — same idea,
+        ** for dot_expr() to resolve a global class-type annotation when the
+        ** receiver isn't a local (see set_global_type_hint()). */
+        Token pending_receiver_;
+        bool pending_receiver_valid_;
+        Token pending_subscript_receiver_;
+        bool pending_subscript_receiver_valid_;
+
+        /* A subscript result's type is only valid until the following dot
+        ** expression consumes it; keeping this ephemeral avoids assigning
+        ** type metadata to arbitrary reusable temporaries. */
+        int typed_subscript_reg_;
+        Token typed_subscript_class_;
+        /* Result register of a self-returning method call whose receiver
+        ** class was known — valid only for the dot that follows at once. */
+        int typed_call_reg_;
+        Token typed_call_class_;
+        bool typed_call_exact_;
+        /* True while the right-hand side of `a, b = expr` is compiled: the
+        ** call found there gets its result count patched into C, so it has
+        ** to be the plain OP_INVOKE / OP_INVOKE_VT form (C = nresults),
+        ** never OP_INVOKE_R / OP_INVOKE_VT_R (C = receiver register). */
+        bool multi_assign_rhs_;
+        /* The shape of the most recent simple comparison, left by
+        ** comparison() for emit_cond_jump(): valid only while nothing else
+        ** has been emitted since (end_offset == current offset). Lets
+        ** `x < 2` / `x == None` branch without materialising the literal
+        ** or the boolean. */
+        struct LastCmp
+        {
+            bool valid;
+            int end_offset;   /* offset right after the comparison's code */
+            int load_offset;  /* the LOADI/LOADNIL of the literal operand  */
+            int reg;          /* the boolean's register                    */
+            int lhs;          /* the non-literal operand's register        */
+            int rhs;          /* the literal's temporary                   */
+            TokenType op;     /* TOK_LT/GT/LTEQ/GTEQ/EQEQ/BANGEQ/IS          */
+            bool negated;     /* `is not` (op == TOK_IS only)               */
+            int imm_kind;     /* 1 = int8 literal, 2 = None                 */
+            int imm;
+        };
+        LastCmp last_cmp_;
+        /* Offset right after a chained comparison (`a < b < c`): its
+        ** short-circuit jump lands there expecting the boolean already in
+        ** its register, so no branch fusion may replace the last compare. */
+        int cmp_chain_end_;
+        /* Set by call_expr() when the expression just parsed was exactly a
+        ** `ClassName(...)` constructor call; cleared by every other rule. */
+        bool last_expr_ctor_valid_;
+        Token last_expr_ctor_class_;
+        static const int kMaxFnWrittenGlobals = 64;
+        int fn_written_globals_[kMaxFnWrittenGlobals];
+        int fn_written_global_count_;
+
+        int lookup_class_field(ObjString *name) const;
+        int add_class_field(ObjString *name);
+        /* Reads one literal as the value of a class body field and puts it in
+        ** the constant pool. False if what follows is not a literal. */
+        bool class_field_literal(int &out_const_index);
+        bool is_current_class_instance(int reg) const; /* true if reg is self or typed param */
+        void save_class_fields(Token class_name);
+        bool inherit_class_fields(Token parent_name);
+    };
+
+} /* namespace zen */
+
+#endif /* ZEN_COMPILER_H */

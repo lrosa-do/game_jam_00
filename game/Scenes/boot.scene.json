@@ -1,0 +1,11 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "Node",
+    "name": "Boot",
+    "properties": {
+      "script": "Assets/Scripts/boot.py"
+    }
+  }
+}

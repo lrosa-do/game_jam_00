@@ -1,0 +1,69 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "Node3D",
+    "name": "Floater",
+    "groups": [
+      "floater"
+    ],
+    "properties": {
+      "script": "Assets/Scripts/floater.py"
+    },
+    "children": [
+      {
+        "instance": "Assets/Models/Floater/floater.glb",
+        "name": "Model",
+        "properties": {
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Engine",
+        "properties": {
+          "stream": "Assets/Sounds/floater/Floater_Engine04.ogg",
+          "volume_linear": 0.5,
+          "loop": true,
+          "autoplay": true
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Shot",
+        "properties": {
+          "stream": "Assets/Sounds/floater/Floater_Fire01.ogg",
+          "volume_linear": 0.9
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Sight",
+        "properties": {
+          "stream": "Assets/Sounds/floater/Floater_Sight01.ogg",
+          "volume_linear": 0.9
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Death",
+        "properties": {
+          "stream": "Assets/Sounds/floater/Floater_DeathScream01.ogg",
+          "volume_linear": 1.0
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Hit",
+        "properties": {
+          "stream": "Assets/Sounds/cop/punch_01.wav",
+          "volume_linear": 0.8
+        }
+      }
+    ]
+  }
+}

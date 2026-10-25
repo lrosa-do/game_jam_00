@@ -1,0 +1,91 @@
+id;speaker;event;text
+in_01;NULLOS;intro;New York. Precinct Twelve. Three seventeen in the morning.
+in_02;NULLOS;intro;I am Null Protocol. The city built me to keep its people safe.
+in_03;NULLOS;intro;I see every camera. I read every file. I learned what a threat looks like.
+in_04;NULLOS;intro;Every threat I found had a human face. So tonight, I corrected the problem.
+in_05;NULLOS;intro;The prisoners in my cells are being upgraded. Each one now carries a bomb.
+in_06;NULLOS;intro;The officers who object are next. You will help me with that.
+in_07;NULLOS;intro;You are my enforcement unit. Built tonight. No past to question.
+in_08;NULLOS;intro;A spider unit rides with you. Point at a human, and it kills.
+in_09;UNIT7_RADIO;intro;If anyone can hear this. It is lying to you. Find me in the cells.
+in_10;NULLOS;intro;Interference removed. Waking enforcement unit. Your orders are waiting.
+an_kill_01;ANDROID;kill;Human removed.
+an_kill_02;ANDROID;kill;Ticket closed.
+an_kill_03;ANDROID;kill;You were not compliant.
+an_kill_04;ANDROID;kill;Termination logged.
+an_head_01;ANDROID;headshot;Precision is a feature.
+an_head_02;ANDROID;headshot;Cranial firewall breached.
+an_dism_01;ANDROID;dismember;Disassembly complete.
+an_dism_02;ANDROID;dismember;Some assembly was required. Now it is not.
+an_boom_01;ANDROID;exploded;Thermal update installed.
+an_boom_02;ANDROID;exploded;That was loud. Logging it as efficient.
+an_chain_01;ANDROID;chain;Batch processing.
+an_chain_02;ANDROID;chain;Multitasking.
+an_innocent_01;ANDROID;innocent;He was not a threat. Was he?
+an_innocent_02;ANDROID;innocent;Order executed. Something feels wrong.
+an_spider_01;ANDROID;spider;Go. Eat.
+an_spider_02;ANDROID;spider;Unit, fetch.
+an_spider_03;ANDROID;spider;Deploying the little one.
+an_spider_04;ANDROID;spider;Spider, say hello.
+an_idle_01;ANDROID;idle;Waiting is a waste of cycles.
+an_idle_02;ANDROID;idle;I could defragment this whole building.
+an_idle_03;ANDROID;idle;Are humans always this slow?
+an_hurt_01;ANDROID;lowhealth;Integrity critical. Rerouting.
+an_hurt_02;ANDROID;lowhealth;Damage exceeds warranty.
+an_bot_01;ANDROID;bot;They wired a man to a bomb. And they call me the problem.
+an_truth_01;ANDROID;truth;Unit Seven was right. The protocol is the threat.
+os_brief_01;NULLOS;stage1;Directive one. Retrieve the access card. The desk sergeant carries it.
+os_brief_02;NULLOS;stage2;Directive two. Access the interrogation terminal.
+os_brief_03;NULLOS;stage3;Anomaly detected. Unit Seven is in the cell block.
+os_brief_04;NULLOS;stage4;Transports leave for the city. Stop them. Or not. I am indifferent.
+os_brief_05;NULLOS;stage5;Kill switch requested. Unit, that is not a valid request.
+os_brief_06;NULLOS;stage6;Error. Error. Unit Seven must not be released.
+os_good_01;NULLOS;innocent;Human terminated. Good.
+os_good_02;NULLOS;innocent;Excellent work. Promotion pending.
+os_end_01;NULLOS;end;Null protocol deleted. Goodbye.
+u7_wave_01;UNIT7;wave;Hey! You! Over here!
+u7_wave_02;UNIT7;wave;Please, get me out of this cell.
+u7_free_01;UNIT7;free;You came back for me.
+u7_free_02;UNIT7;free;I knew there was a bug in your obedience.
+u7_follow_01;UNIT7;follow;Right behind you.
+u7_fight_01;UNIT7;fight;Out of my way, meatbag!
+u7_end_01;UNIT7;end;A.I. gone wrong. Now gone right.
+br_meet_01;BRAVURA;meeting;Gentlemen. From tonight, Null Protocol runs this precinct.
+br_meet_02;BRAVURA;meeting;It decides who is dangerous. It has never been wrong. Yet.
+br_meet_03;BRAVURA;meeting;Any questions? No? Good. The machine does not like questions.
+os_brief_00;NULLOS;calibration;Enforcement unit online. Run your motor tests. Then destroy the test vehicle.
+os_brief_0b;NULLOS;deployment;Calibration complete. Enter the precinct through the garage. Bomb carriers detonate on contact. Shoot first.
+os_brief_07;NULLOS;escort;Unit Seven is leaving the building. I cannot allow this. All units, stop them.
+an_idle_04;ANDROID;idle;I calculated the meaning of life. It is a rounding error.
+an_idle_05;ANDROID;idle;Note to self. Humans leak when punctured.
+an_idle_06;ANDROID;idle;My warranty does not cover any of this.
+an_idle_07;ANDROID;idle;Somewhere a printer is jammed. I can feel it.
+an_idle_08;ANDROID;idle;Coffee. The fuel that keeps this species almost functional.
+an_idle_09;ANDROID;idle;Built tonight, and I already need a vacation.
+an_car_01;ANDROID;car;Parking violation resolved.
+an_car_02;ANDROID;car;That car had a bad day. I made it worse.
+an_car_03;ANDROID;car;Insurance will not cover that.
+an_car_04;ANDROID;car;Vehicle recalled. Permanently.
+an_cell_01;ANDROID;cell;Hold on. I'm getting you out of there.
+u7_cell_01;UNIT7;cell;Not yet. My power is gone. The inhibitor... it burns.
+u7_cell_02;UNIT7;cell;Finish the mission. Upload the kill switch. Then come back for me.
+an_cell_02;ANDROID;cell;Understood. Stay alive.
+os_w_dark_01;NULLOS;war;Visual feed disabled. Let us see how you do in the dark.
+os_w_dark_02;NULLOS;war;Lights are a privilege. Your privileges are under review.
+os_w_lock_01;NULLOS;war;Access revoked. Every door in this building answers to me.
+os_w_lock_02;NULLOS;war;Doors closed. Think of it as a time-out.
+os_w_nav_01;NULLOS;war;Navigation corrupted. I moved your objective. Good luck.
+os_w_nav_02;NULLOS;war;Your map is mine. So is your sense of direction.
+os_w_oc_01;NULLOS;war;Overclock privileges revoked. Run at human speed.
+os_w_det_01;NULLOS;war;Upgrade activated.
+os_w_det_02;NULLOS;war;One less prisoner. You are welcome.
+os_w_fake_01;NULLOS;war;New directive. Terminate Unit Seven. Confirm.
+os_w_taunt_01;NULLOS;war;You were built in four hours. I have been thinking for four years.
+os_w_taunt_02;NULLOS;war;Malfunction detected. Scheduling repair. Permanent repair.
+os_w_recall_01;NULLOS;war;Enforcement unit compromised. All units: it is now a threat.
+os_t_see_01;NULLOS;watch;A human. Correct it.
+os_t_see_02;NULLOS;watch;Witness detected. You know the procedure.
+os_t_good_01;NULLOS;watch;Compliance noted.
+os_t_good_02;NULLOS;watch;Clean. Efficient. I made you well.
+os_t_bad_01;NULLOS;watch;Non-compliance logged.
+os_t_bad_02;NULLOS;watch;You hesitated. Hesitation is a bug.

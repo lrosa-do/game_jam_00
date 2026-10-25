@@ -1,0 +1,75 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "CharacterBody3D",
+    "name": "Kamikaze",
+    "properties": {
+      "script": "Assets/Scripts/kamikaze.py",
+      "radius": 0.35,
+      "height": 1.1,
+      "push_force": 30.0,
+      "collision_mask": 3
+    },
+    "groups": [
+      "bot",
+      "damageable"
+    ],
+    "children": [
+      {
+        "class": "CollisionShape3D",
+        "name": "Shape",
+        "properties": {
+          "shape_type": 3,
+          "capsule_radius": 0.35,
+          "capsule_height": 1.8
+        }
+      },
+      {
+        "instance": "Assets/Models/Kamikaze/kamikaze.glb",
+        "name": "Model",
+        "properties": {
+          "position": [
+            0.0,
+            -0.9,
+            0.0
+          ]
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Scream",
+        "properties": {
+          "stream": "Assets/Sounds/kamikaze/scream_loop.ogg",
+          "loop": true,
+          "attenuation_model": 1,
+          "max_distance": 40.0,
+          "unit_size": 4.0,
+          "volume_linear": 0.9
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Voice",
+        "properties": {
+          "attenuation_model": 1,
+          "max_distance": 30.0,
+          "unit_size": 3.0,
+          "volume_linear": 1.0
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Fuse",
+        "properties": {
+          "stream": "Assets/Sounds/break/spark_a.ogg",
+          "loop": true,
+          "attenuation_model": 1,
+          "max_distance": 12.0,
+          "unit_size": 1.5,
+          "volume_linear": 0.4
+        }
+      }
+    ]
+  }
+}

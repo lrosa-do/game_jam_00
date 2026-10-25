@@ -1,0 +1,15 @@
+add_executable(prisma3d_pack packer/main.cpp)
+target_link_libraries(prisma3d_pack PRIVATE prisma3d)
+if(NOT MSVC)
+  target_compile_options(prisma3d_pack PRIVATE ${PRISMA3D_WARNINGS} -fno-exceptions -fno-rtti)
+endif()
+
+add_executable(prisma3d_export exporter/main.cpp)
+target_link_libraries(prisma3d_export PRIVATE prisma3d)
+if(NOT MSVC)
+  target_compile_options(prisma3d_export PRIVATE ${PRISMA3D_WARNINGS} -fno-exceptions -fno-rtti)
+endif()
+
+set_target_properties(prisma3d_pack prisma3d_export PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PRISMA3D_BIN_DIR})
+set_target_properties(prisma3d_pack PROPERTIES OUTPUT_NAME pack)
+set_target_properties(prisma3d_export PROPERTIES OUTPUT_NAME export)

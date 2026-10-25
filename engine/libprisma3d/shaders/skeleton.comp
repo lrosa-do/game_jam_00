@@ -1,0 +1,108 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 2, binding = 0, std430) buffer restrict readonly SrcVertexData
+{
+    uint data[];
+}
+src_vertices;
+
+layout(set = 2, binding = 1, std430) buffer restrict writeonly DstVertexData
+{
+    uint data[];
+}
+dst_vertices;
+
+layout(set = 2, binding = 2, std430) buffer restrict readonly SkeletonData
+{
+    vec4 data[];
+}
+bone_transforms;
+
+layout(set = 0, binding = 0, std140) uniform Params
+{
+    uint vertex_count;
+    uint vertex_stride;
+    uint position_offset;
+    uint normal_offset;
+    uint tangent_offset;
+    uint joints_offset;
+    uint weights_offset;
+    uint flags;
+}
+params;
+
+const uint kHasNormal = 1u;
+const uint kHasTangent = 2u;
+
+mat4 bone_matrix(uint bone)
+{
+    uint row = bone * 3u;
+    return mat4(bone_transforms.data[row], bone_transforms.data[row + 1u],
+            bone_transforms.data[row + 2u], vec4(0.0, 0.0, 0.0, 1.0));
+}
+
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= params.vertex_count) return;
+
+    uint base = index * params.vertex_stride;
+
+    uint src_position = base + params.position_offset;
+    vec3 vertex = uintBitsToFloat(uvec3(src_vertices.data[src_position + 0u],
+            src_vertices.data[src_position + 1u], src_vertices.data[src_position + 2u]));
+
+    vec3 normal = vec3(0.0);
+    uint src_normal = base + params.normal_offset;
+    if ((params.flags & kHasNormal) != 0u)
+        normal = uintBitsToFloat(uvec3(src_vertices.data[src_normal + 0u],
+                src_vertices.data[src_normal + 1u], src_vertices.data[src_normal + 2u]));
+
+    vec4 tangent = vec4(0.0);
+    uint src_tangent = base + params.tangent_offset;
+    if ((params.flags & kHasTangent) != 0u)
+        tangent = uintBitsToFloat(uvec4(src_vertices.data[src_tangent + 0u],
+                src_vertices.data[src_tangent + 1u], src_vertices.data[src_tangent + 2u],
+                src_vertices.data[src_tangent + 3u]));
+
+    uint joints = src_vertices.data[base + params.joints_offset];
+    uvec4 bones = uvec4(joints & 0xFFu, (joints >> 8u) & 0xFFu, (joints >> 16u) & 0xFFu,
+            (joints >> 24u) & 0xFFu);
+    uint src_weights = base + params.weights_offset;
+    vec4 weights = uintBitsToFloat(uvec4(src_vertices.data[src_weights + 0u],
+            src_vertices.data[src_weights + 1u], src_vertices.data[src_weights + 2u],
+            src_vertices.data[src_weights + 3u]));
+
+    mat4 m = bone_matrix(bones.x) * weights.x;
+    m += bone_matrix(bones.y) * weights.y;
+    m += bone_matrix(bones.z) * weights.z;
+    m += bone_matrix(bones.w) * weights.w;
+
+    vertex = (vec4(vertex, 1.0) * m).xyz;
+    normal = normalize((vec4(normal, 0.0) * m).xyz);
+    tangent.xyz = normalize((vec4(tangent.xyz, 0.0) * m).xyz);
+
+    uvec3 uvertex = floatBitsToUint(vertex);
+    dst_vertices.data[src_position + 0u] = uvertex.x;
+    dst_vertices.data[src_position + 1u] = uvertex.y;
+    dst_vertices.data[src_position + 2u] = uvertex.z;
+
+    if ((params.flags & kHasNormal) != 0u)
+    {
+        uvec3 unormal = floatBitsToUint(normal);
+        dst_vertices.data[src_normal + 0u] = unormal.x;
+        dst_vertices.data[src_normal + 1u] = unormal.y;
+        dst_vertices.data[src_normal + 2u] = unormal.z;
+    }
+
+    if ((params.flags & kHasTangent) != 0u)
+    {
+        uvec4 utangent = floatBitsToUint(tangent);
+        dst_vertices.data[src_tangent + 0u] = utangent.x;
+        dst_vertices.data[src_tangent + 1u] = utangent.y;
+        dst_vertices.data[src_tangent + 2u] = utangent.z;
+        dst_vertices.data[src_tangent + 3u] = utangent.w;
+    }
+}

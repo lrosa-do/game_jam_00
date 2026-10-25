@@ -1,0 +1,547 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "Node3D",
+    "name": "BulletArena",
+    "properties": {
+      "script": "Assets/Scripts/bullet_arena.py"
+    },
+    "children": [
+      {
+        "class": "WorldEnvironment",
+        "name": "Environment",
+        "properties": {
+          "background_mode": 2,
+          "sky_top_color": [
+            0.012,
+            0.018,
+            0.04,
+            1.0
+          ],
+          "sky_horizon_color": [
+            0.17,
+            0.11,
+            0.08,
+            1.0
+          ],
+          "sky_curve": 0.12,
+          "sky_ground_bottom_color": [
+            0.02,
+            0.02,
+            0.025,
+            1.0
+          ],
+          "sky_ground_horizon_color": [
+            0.17,
+            0.11,
+            0.08,
+            1.0
+          ],
+          "sky_ground_curve": 0.05,
+          "sky_sun_angle_max": 0.0,
+          "glow_enabled": true,
+          "glow_intensity": 0.7,
+          "glow_bloom": 0.04,
+          "glow_hdr_threshold": 0.9,
+          "tonemap_mode": 3,
+          "tonemap_exposure": 1.05,
+          "tonemap_white": 1.0,
+          "adjustment_enabled": true,
+          "adjustment_brightness": 1.0,
+          "adjustment_contrast": 1.08,
+          "adjustment_saturation": 0.85
+        }
+      },
+      {
+        "class": "DirectionalLight3D",
+        "name": "Sun",
+        "properties": {
+          "rotation": [
+            -0.9,
+            0.5,
+            0.0
+          ],
+          "shadow_enabled": true,
+          "light_energy": 1.4
+        }
+      },
+      {
+        "class": "StaticBody3D",
+        "name": "Floor",
+        "properties": {
+          "position": [
+            0.0,
+            -0.1,
+            0.0
+          ]
+        },
+        "children": [
+          {
+            "class": "CollisionShape3D",
+            "name": "Shape",
+            "properties": {
+              "shape_type": 1,
+              "box_size": [
+                40.0,
+                0.2,
+                40.0
+              ]
+            }
+          },
+          {
+            "class": "MeshInstance3D",
+            "name": "Mesh",
+            "properties": {
+              "mesh": "primitive:box?size=40,0.2,40",
+              "color": [
+                0.35,
+                0.36,
+                0.4,
+                1.0
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "class": "StaticBody3D",
+        "name": "WallN",
+        "properties": {
+          "position": [
+            0.0,
+            1.5,
+            -20.0
+          ]
+        },
+        "children": [
+          {
+            "class": "CollisionShape3D",
+            "name": "Shape",
+            "properties": {
+              "shape_type": 1,
+              "box_size": [
+                40.0,
+                3.0,
+                0.4
+              ]
+            }
+          },
+          {
+            "class": "MeshInstance3D",
+            "name": "Mesh",
+            "properties": {
+              "mesh": "primitive:box?size=40,3,0.4",
+              "color": [
+                0.5,
+                0.42,
+                0.36,
+                1.0
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "class": "StaticBody3D",
+        "name": "WallS",
+        "properties": {
+          "position": [
+            0.0,
+            1.5,
+            20.0
+          ]
+        },
+        "children": [
+          {
+            "class": "CollisionShape3D",
+            "name": "Shape",
+            "properties": {
+              "shape_type": 1,
+              "box_size": [
+                40.0,
+                3.0,
+                0.4
+              ]
+            }
+          },
+          {
+            "class": "MeshInstance3D",
+            "name": "Mesh",
+            "properties": {
+              "mesh": "primitive:box?size=40,3,0.4",
+              "color": [
+                0.5,
+                0.42,
+                0.36,
+                1.0
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "class": "StaticBody3D",
+        "name": "WallE",
+        "properties": {
+          "position": [
+            20.0,
+            1.5,
+            0.0
+          ]
+        },
+        "children": [
+          {
+            "class": "CollisionShape3D",
+            "name": "Shape",
+            "properties": {
+              "shape_type": 1,
+              "box_size": [
+                0.4,
+                3.0,
+                40.0
+              ]
+            }
+          },
+          {
+            "class": "MeshInstance3D",
+            "name": "Mesh",
+            "properties": {
+              "mesh": "primitive:box?size=0.4,3,40",
+              "color": [
+                0.5,
+                0.42,
+                0.36,
+                1.0
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "class": "StaticBody3D",
+        "name": "WallW",
+        "properties": {
+          "position": [
+            -20.0,
+            1.5,
+            0.0
+          ]
+        },
+        "children": [
+          {
+            "class": "CollisionShape3D",
+            "name": "Shape",
+            "properties": {
+              "shape_type": 1,
+              "box_size": [
+                0.4,
+                3.0,
+                40.0
+              ]
+            }
+          },
+          {
+            "class": "MeshInstance3D",
+            "name": "Mesh",
+            "properties": {
+              "mesh": "primitive:box?size=0.4,3,40",
+              "color": [
+                0.5,
+                0.42,
+                0.36,
+                1.0
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "class": "StaticBody3D",
+        "name": "Pillar1",
+        "properties": {
+          "position": [
+            4.0,
+            1.5,
+            -6.0
+          ]
+        },
+        "children": [
+          {
+            "class": "CollisionShape3D",
+            "name": "Shape",
+            "properties": {
+              "shape_type": 1,
+              "box_size": [
+                1.0,
+                3.0,
+                1.0
+              ]
+            }
+          },
+          {
+            "class": "MeshInstance3D",
+            "name": "Mesh",
+            "properties": {
+              "mesh": "primitive:box?size=1,3,1",
+              "color": [
+                0.5,
+                0.42,
+                0.36,
+                1.0
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "class": "StaticBody3D",
+        "name": "Pillar2",
+        "properties": {
+          "position": [
+            -4.0,
+            1.5,
+            -6.0
+          ]
+        },
+        "children": [
+          {
+            "class": "CollisionShape3D",
+            "name": "Shape",
+            "properties": {
+              "shape_type": 1,
+              "box_size": [
+                1.0,
+                3.0,
+                1.0
+              ]
+            }
+          },
+          {
+            "class": "MeshInstance3D",
+            "name": "Mesh",
+            "properties": {
+              "mesh": "primitive:box?size=1,3,1",
+              "color": [
+                0.5,
+                0.42,
+                0.36,
+                1.0
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "class": "StaticBody3D",
+        "name": "Pillar3",
+        "properties": {
+          "position": [
+            0.0,
+            1.5,
+            -12.0
+          ]
+        },
+        "children": [
+          {
+            "class": "CollisionShape3D",
+            "name": "Shape",
+            "properties": {
+              "shape_type": 1,
+              "box_size": [
+                3.0,
+                3.0,
+                1.0
+              ]
+            }
+          },
+          {
+            "class": "MeshInstance3D",
+            "name": "Mesh",
+            "properties": {
+              "mesh": "primitive:box?size=3,3,1",
+              "color": [
+                0.5,
+                0.42,
+                0.36,
+                1.0
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "class": "StaticBody3D",
+        "name": "Ledge",
+        "properties": {
+          "position": [
+            8.0,
+            0.5,
+            2.0
+          ]
+        },
+        "children": [
+          {
+            "class": "CollisionShape3D",
+            "name": "Shape",
+            "properties": {
+              "shape_type": 1,
+              "box_size": [
+                4.0,
+                1.0,
+                2.0
+              ]
+            }
+          },
+          {
+            "class": "MeshInstance3D",
+            "name": "Mesh",
+            "properties": {
+              "mesh": "primitive:box?size=4,1,2",
+              "color": [
+                0.5,
+                0.42,
+                0.36,
+                1.0
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "instance": "Assets/Prefabs/player.scene.json",
+        "name": "Player",
+        "properties": {
+          "position": [
+            0.0,
+            0.2,
+            8.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      {
+        "instance": "Assets/Prefabs/barrel.scene.json",
+        "name": "Barrel_1",
+        "properties": {
+          "position": [
+            -3.0,
+            0.5,
+            -3.0
+          ]
+        }
+      },
+      {
+        "instance": "Assets/Prefabs/barrel.scene.json",
+        "name": "Barrel_2",
+        "properties": {
+          "position": [
+            3.0,
+            0.5,
+            -3.0
+          ]
+        }
+      },
+      {
+        "instance": "Assets/Prefabs/barrel.scene.json",
+        "name": "Barrel_3",
+        "properties": {
+          "position": [
+            -6.0,
+            0.5,
+            -10.0
+          ]
+        }
+      },
+      {
+        "instance": "Assets/Prefabs/barrel.scene.json",
+        "name": "Barrel_4",
+        "properties": {
+          "position": [
+            6.0,
+            0.5,
+            -10.0
+          ]
+        }
+      },
+      {
+        "instance": "Assets/Prefabs/barrel.scene.json",
+        "name": "Barrel_5",
+        "properties": {
+          "position": [
+            0.0,
+            0.5,
+            -16.0
+          ]
+        }
+      },
+      {
+        "instance": "Assets/Prefabs/crate_small.scene.json",
+        "name": "Crate_1",
+        "properties": {
+          "position": [
+            -1.5,
+            0.5,
+            -8.0
+          ]
+        }
+      },
+      {
+        "instance": "Assets/Prefabs/crate_small.scene.json",
+        "name": "Crate_2",
+        "properties": {
+          "position": [
+            1.5,
+            0.5,
+            -8.0
+          ]
+        }
+      },
+      {
+        "instance": "Assets/Prefabs/crate_small.scene.json",
+        "name": "Crate_3",
+        "properties": {
+          "position": [
+            -8.0,
+            0.5,
+            -2.0
+          ]
+        }
+      },
+      {
+        "instance": "Assets/Prefabs/crate_small.scene.json",
+        "name": "Crate_4",
+        "properties": {
+          "position": [
+            8.0,
+            0.5,
+            -6.0
+          ]
+        }
+      },
+      {
+        "instance": "Assets/Prefabs/crate_big.scene.json",
+        "name": "Crate_5",
+        "properties": {
+          "position": [
+            -8.0,
+            0.7,
+            -8.0
+          ]
+        }
+      },
+      {
+        "class": "Node",
+        "name": "RenderPresets",
+        "properties": {
+          "script": "Assets/Scripts/render_presets.py",
+          "quality": 1
+        }
+      }
+    ]
+  }
+}

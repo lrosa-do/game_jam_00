@@ -1,0 +1,44 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "RigidBody3D",
+    "name": "Barrel",
+    "properties": {
+      "script": "Assets/Scripts/barrel.py",
+      "mass": 60.0
+    },
+    "groups": [
+      "barrel",
+      "blastable",
+      "damageable"
+    ],
+    "children": [
+      {
+        "class": "CollisionShape3D",
+        "name": "Shape",
+        "properties": {
+          "shape_type": 4,
+          "cylinder_radius": 0.35,
+          "cylinder_height": 0.91
+        }
+      },
+      {
+        "instance": "Assets/Models/Props/barrel.glb",
+        "name": "Model",
+        "properties": {
+          "position": [
+            0.0,
+            -0.46,
+            0.0
+          ],
+          "scale": [
+            0.75,
+            0.75,
+            0.75
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,40 @@
+material "ammo" {
+    color            = (0.25, 0.2, 0.08, 1)
+    metallic         = 0.6
+    roughness        = 0.35
+    emission_color   = (1, 0.65, 0.15)
+    emission_energy  = 2.5
+}
+
+material "energy" {
+    color            = (0.05, 0.25, 0.3, 1)
+    roughness        = 0.2
+    emission_color   = (0.3, 0.9, 1)
+    emission_energy  = 3
+}
+
+material "ring_ammo" {
+    color            = (0, 0, 0, 1)
+    emission_color   = (1, 0.6, 0.1)
+    emission_energy  = 2
+}
+
+material "ring_energy" {
+    color            = (0, 0, 0, 1)
+    emission_color   = (0.3, 0.9, 1)
+    emission_energy  = 2
+}
+
+material "keycard" {
+    color            = (0.05, 0.12, 0.08, 1)
+    metallic         = 0.4
+    roughness        = 0.3
+    emission_color   = (0.2, 1, 0.45)
+    emission_energy  = 3
+}
+
+material "ring_keycard" {
+    color            = (0, 0, 0, 1)
+    emission_color   = (0.2, 1, 0.45)
+    emission_energy  = 2
+}

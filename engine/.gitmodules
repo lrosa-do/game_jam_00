@@ -1,0 +1,32 @@
+[submodule "external/prisma"]
+	path = external/prisma
+	url = https://github.com/akadjoker/prisma
+	branch = master
+[submodule "external/containers"]
+	path = external/containers
+	url = https://github.com/akadjoker/containers
+	branch = main
+[submodule "external/math"]
+	path = external/math
+	url = https://github.com/akadjoker/math
+	branch = main
+[submodule "external/zen_plataform"]
+	path = external/zen_plataform
+	url = https://github.com/akadjoker/zen_plataform
+	branch = master
+[submodule "external/iGUI"]
+	path = external/iGUI
+	url = https://github.com/akadjoker/iGUI
+	branch = main
+[submodule "external/Kinetix"]
+	path = external/Kinetix
+	url = https://github.com/akadjoker/Kinetix
+	branch = main
+[submodule "external/zenpy"]
+	path = external/zenpy
+	url = https://github.com/akadjoker/zenpy
+	branch = main
+[submodule "external/glslang"]
+	path = external/glslang
+	url = https://github.com/KhronosGroup/glslang
+	shallow = true

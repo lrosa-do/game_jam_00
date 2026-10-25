@@ -1,0 +1,359 @@
+#pragma once
+
+#include "Widget.hpp"
+#include "Theme.hpp"
+#include "Utf8.hpp"
+#include <igui/widgets/String.hpp>
+#include <ct/function.hpp>
+#include <ct/vector.hpp>
+
+
+namespace ig { namespace retained
+{
+// ═════════════════════════════════════════════════════════════════════════════
+//  TextInput - single-line text input field
+//  Modes: Normal, Password (•), NumberOnly (digits/-.+), ReadOnly
+// ═════════════════════════════════════════════════════════════════════════════
+
+class TextInput : public Widget
+{
+public:
+    IG_WIDGET_CLASS(TextInput, Widget);
+
+    enum class Mode { Normal, Password, NumberOnly, ReadOnly };
+
+    explicit TextInput(const String& text = "", Mode mode = Mode::Normal);
+
+    /// @brief Set the text content.
+    void setText(const String& t);
+    /// @brief Get the text content.
+    const String& text() const { return text_; }
+
+    /// @brief Set placeholder text shown when empty.
+    void setPlaceholder(const String& p) { placeholder_ = p; markDirty(); }
+    /// @brief Get the placeholder text.
+    const String& placeholder() const    { return placeholder_; }
+
+    /// @brief Set the input mode (Normal, Password, NumberOnly, ReadOnly).
+    void setMode(Mode m) { mode_ = m; markDirty(); }
+    /// @brief Get the input mode.
+    Mode mode() const    { return mode_; }
+
+    /// @brief Select all text.
+    void selectAll();
+    /// @brief Clear the text selection.
+    void clearSelection();
+    /// @brief Check if any text is selected.
+    bool hasSelection() const { return selStart_ != selEnd_; }
+    /// @brief Get the selected text.
+    String selectedText() const;
+
+    /// @brief Get the cursor position (character index).
+    int cursorPos() const { return cursor_; }
+    /// @brief Set the cursor position.
+    void setCursorPos(int pos);
+
+    /// @brief Emitted when the text content changes.
+    Signal<const String&> textChanged;
+    /// @brief Emitted when Enter is pressed.
+    Signal<const String&> submitted;
+
+    Vec2f sizeHint() const override;
+    void paint(PaintContext& ctx) override;
+    void onMousePress(MouseEvent& e) override;
+    void onMouseRelease(MouseEvent& e) override;
+    void onMouseMove(MouseEvent& e) override;
+    void onKeyPress(KeyEvent& e) override;
+    void onTextInput(KeyEvent& e) override;
+
+private:
+    String text_;
+    String placeholder_;
+    Mode mode_ = Mode::Normal;
+
+    int   cursor_   = 0;
+    int   selStart_ = 0;
+    int   selEnd_   = 0;
+    float scrollX_  = 0;
+    float blinkTimer_ = 0;
+    bool  dragging_   = false;
+
+    String displayText() const;
+    int   hitTestChar(const ig::retained::Font* font, float localX) const;
+    float cursorXOffset(const ig::retained::Font* font, int pos) const;
+    void  deleteSelection();
+    void  insertText(const String& t);
+    void  ensureCursorVisible(const ig::retained::Font* font);
+    void  clampCursor();
+    bool  isNumberChar(char c) const;
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  TextEdit - multi-line text editor
+//  Features: line numbers, cursor 2D, selection, scroll, word wrap,
+//            tab-to-spaces, clipboard, syntax highlight callback
+// ═════════════════════════════════════════════════════════════════════════════
+
+class TextEdit : public Widget
+{
+public:
+    IG_WIDGET_CLASS(TextEdit, Widget);
+
+    struct TextPos
+    {
+        int line = 0;
+        int col  = 0;
+
+        bool operator==(const TextPos& o) const { return line == o.line && col == o.col; }
+        bool operator!=(const TextPos& o) const { return !(*this == o); }
+        bool operator<(const TextPos& o) const  { return line < o.line || (line == o.line && col < o.col); }
+        bool operator>(const TextPos& o) const  { return o < *this; }
+        bool operator<=(const TextPos& o) const { return !(o < *this); }
+        bool operator>=(const TextPos& o) const { return !(*this < o); }
+    };
+
+    struct ColorSpan
+    {
+        int startCol, endCol;
+        Color color;
+    };
+
+    using SyntaxCallback = ct::Function<ct::Vector<ColorSpan>(int lineIndex, const String& lineText)>;
+
+    explicit TextEdit(const String& text = "");
+
+    /// @brief Set the entire text content.
+    void setText(const String& text);
+    /// @brief Get all text as a single string.
+    String text() const;
+    /// @brief Get the number of lines.
+    int lineCount() const { return static_cast<int>(lines_.size()); }
+    /// @brief Get the text of line n.
+    const String& lineAt(int n) const;
+
+    /// @brief Get the cursor position (line, col).
+    TextPos cursorPos() const { return cursor_; }
+    /// @brief Set the cursor position.
+    void setCursorPos(TextPos pos);
+    /// @brief Set the cursor by line and column.
+    void setCursorPos(int line, int col);
+
+    /// @brief Select all text.
+    void selectAll();
+    /// @brief Select an entire line.
+    void selectLine(int n);
+    /// @brief Set selection by start and end positions.
+    void setSelection(TextPos start, TextPos end);
+    /// @brief Clear the selection.
+    void clearSelection() { selAnchor_ = cursor_; markDirty(); }
+    /// @brief Check if there is a selection.
+    bool hasSelection() const { return selAnchor_ != cursor_; }
+    /// @brief Get the selected text.
+    String selectedText() const;
+    /// @brief Get the start of the selection.
+    TextPos selectionStart() const { return cursor_ < selAnchor_ ? cursor_ : selAnchor_; }
+    /// @brief Get the end of the selection.
+    TextPos selectionEnd()   const { return cursor_ > selAnchor_ ? cursor_ : selAnchor_; }
+
+    /// @brief Set read-only mode.
+    void setReadOnly(bool r) { readOnly_ = r; }
+    /// @brief Check if in read-only mode.
+    bool readOnly() const    { return readOnly_; }
+
+    /// @brief Show or hide line numbers in the gutter.
+    void setShowLineNumbers(bool s) { showLineNumbers_ = s; markDirty(); }
+    /// @brief Check if line numbers are shown.
+    bool showLineNumbers() const    { return showLineNumbers_; }
+
+    /// @brief Enable or disable word wrap.
+    void setWordWrap(bool w) { wordWrap_ = w; wrapDirty_ = true; if (w) scrollX_ = 0; markDirty(); }
+    /// @brief Check if word wrap is enabled.
+    bool wordWrap() const    { return wordWrap_; }
+
+    /// @brief Set the tab stop width in spaces.
+    void setTabSize(int n) { tabSize_ = n; }
+    /// @brief Get the tab stop width.
+    int  tabSize() const   { return tabSize_; }
+
+    /// @brief Set font zoom scale (1.0 = 100%).
+    void setFontScale(float s) { fontScale_ = max2(0.5f, min2(3.0f, s)); markDirty(); }
+    /// @brief Get font zoom scale.
+    float fontScale() const    { return fontScale_; }
+
+    /// @brief Set a callback for syntax highlighting.
+    void setSyntaxCallback(SyntaxCallback cb) { syntaxCb_ = std::move(cb); }
+
+    // ── Clipboard ─────────────────────────────────────────────────────────
+
+    /// @brief Copy selected text to clipboard.
+    void copy();
+    /// @brief Cut selected text to clipboard.
+    void cut();
+    /// @brief Paste text from clipboard at cursor.
+    void paste();
+
+    /// @brief Insert text at a specific position (does not move cursor).
+    void insertTextAt(TextPos pos, const String& text);
+
+    // ── Gutter markers ────────────────────────────────────────────────────
+    enum class MarkerType { Breakpoint, Error, Warning, Bookmark, Info };
+
+    /// @brief Set a gutter marker on a line.
+    void setMarker(int line, MarkerType type);
+    /// @brief Clear all markers on a line.
+    void clearMarker(int line);
+    /// @brief Clear a specific marker type on a line.
+    void clearMarker(int line, MarkerType type);
+    /// @brief Clear all markers.
+    void clearAllMarkers();
+    /// @brief Check if a line has any marker.
+    bool hasMarker(int line) const;
+    /// @brief Check if a line has a specific marker type.
+    bool hasMarker(int line, MarkerType type) const;
+
+    /// @brief Emitted when a gutter marker is clicked.
+    Signal<int, MarkerType> markerClicked;
+
+    /// @brief Get the first visible line index.
+    int firstVisibleLine() const;
+    /// @brief Get the number of visible lines.
+    int visibleLineCount() const;
+    /// @brief Scroll the view to show a given line.
+    void scrollToLine(int n);
+
+    /// @brief Emitted when text content changes.
+    Signal<>         textChanged;
+    /// @brief Emitted when the cursor moves.
+    Signal<TextPos>  cursorMoved;
+
+    Vec2f sizeHint() const override;
+    void paint(PaintContext& ctx) override;
+    void onMousePress(MouseEvent& e) override;
+    void onMouseRelease(MouseEvent& e) override;
+    void onMouseMove(MouseEvent& e) override;
+    void onMouseScroll(MouseEvent& e) override;
+    void onKeyPress(KeyEvent& e) override;
+    void onTextInput(KeyEvent& e) override;
+
+protected:
+    static const String emptyLine_;
+
+    ct::Vector<String> lines_;
+    TextPos cursor_;
+    TextPos selAnchor_;
+
+    bool  readOnly_       = false;
+    bool  showLineNumbers_ = true;
+    bool  wordWrap_       = false;
+    int   tabSize_        = 4;
+    float fontScale_      = 1.0f;   // zoom: 1.0 = 100%
+
+    float scrollX_ = 0, scrollY_ = 0;
+    float blinkTimer_ = 0;
+    bool  dragging_   = false;
+    float extraGutterW_ = 0;   // extra gutter space (e.g. fold icons)
+
+    SyntaxCallback syntaxCb_;
+
+    /// @brief Optional filter: return false to hide a line (used by CodeEditor folding).
+    ct::Function<bool(int)> lineFilterCb_;
+
+    // Gutter markers: line → set of marker types
+    ct::HashMap<int, ct::HashSet<int>> markers_;  // int = MarkerType
+    void shiftMarkers(int line, int removed, int inserted);
+
+    // Computed each paint
+    mutable float gutterW_    = 0;
+
+    // Helpers accessible to subclasses
+    float lineHeight() const;
+    int  lineColCount(int line) const;
+    void clampPos(TextPos& p) const;
+    void deleteSelection();
+    void insertTextAtCursor(const String& t);
+    void splitLine();
+    void mergeWithPrevLine();
+    void mergeWithNextLine();
+    void ensureCursorVisible();
+    float textViewWidth() const;
+    void  updateGutterWidth(PaintContext& ctx);
+    float maxScrollX() const;
+    float computeGutterWidth(const ig::retained::Font& font) const;
+    float computeLineHeight(const ig::retained::Font& font) const;
+    void invalidateWrap() { wrapDirty_ = true; }
+    void linesChanged(int line, int removed, int inserted);
+    // The markers of lines a and b change places, as the lines just did.
+    void swapLineMarkers(int a, int b);
+    // Told about every change to lines_: `removed` lines at `line` became `inserted`.
+    virtual void onLinesChanged(int, int, int)
+    {
+    }
+    void updateWrap(PaintContext& ctx);
+    int  logicalToVisualRow(int line, int row = 0) const;
+    int lineAtVisualRow(int visualRow) const;
+    String expandTabs(const String& text) const;
+    String expandTabs(const String& text, int startVisCol) const;
+    String expandTabsVisible(const String& text, int startVisCol) const;
+    int  visColAt(int line, int col) const;
+
+private:
+    // Word-wrap cache
+    struct WrapRow { int startCol, endCol; };
+    ct::Vector<ct::Vector<WrapRow>> wrapRows_;
+    bool  wrapDirty_   = true;
+    float wrapWidth_   = 0;
+    float maxContentW_ = 0;
+
+    // Width of each line, and the lines an edit changed since the last paint:
+    // only those are measured again.
+    ct::Vector<float> lineWidths_;
+    ct::Vector<int> staleWrapLines_;
+    bool widestLineGone_ = false;
+    void measureStaleLines(PaintContext& ctx);
+
+    // The cursor was brought into view before its line was measured again; the
+    // next paint does it once more with the measured rows.
+    bool revealCursor_ = false;
+
+    // First visual row of each line (and the total at the end), rebuilt when
+    // the wrap changes.
+    mutable ct::Vector<int> rowStarts_;
+    mutable bool rowStartsDirty_ = true;
+    const ct::Vector<int>& rowStarts() const;
+
+    // Rows and width of each distinct line, kept between full rebuilds so a
+    // rebuild only measures the lines it has not seen.
+    struct WrapLine { ct::Vector<WrapRow> rows; float width = 0; };
+    struct WrapKey
+    {
+        float width = -1.0f;
+        const ig::retained::Font* font = nullptr;
+        float scale = 0.0f;
+        int   tabSize = 0;
+        bool  wrap = false;
+        bool operator==(const WrapKey& o) const
+        {
+            return width == o.width && font == o.font && scale == o.scale &&
+                   tabSize == o.tabSize && wrap == o.wrap;
+        }
+    };
+    ct::HashMap<String, WrapLine> wrapCache_;
+    WrapKey wrapKey_;
+    WrapLine measureLine(PaintContext& ctx, const String& line, float textW) const;
+
+    // Internal helpers
+    float colToX(PaintContext& ctx, int line, int col) const;
+    int   xToCol(PaintContext& ctx, int line, float x) const;
+    TextPos hitTest(PaintContext& ctx, float localX, float localY) const;
+    TextPos hitTestMouse(float localX, float localY) const;
+    void rebuildWrap(PaintContext& ctx);
+    bool wrapNeedsRebuild(const PaintContext& ctx, float textW) const;
+
+    // Visual row helpers (for word-wrap)
+    struct VisualPos { int line, row; };
+    int        totalVisualRows() const;
+    VisualPos  visualToLogical(int visualRow) const;
+};
+
+} // namespace retained
+} // namespace ig

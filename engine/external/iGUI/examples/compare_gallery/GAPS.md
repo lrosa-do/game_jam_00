@@ -1,0 +1,781 @@
+# Levantamento de paridade: iGUI vs demo do ImGui
+
+O que o demo do ImGui (`imgui_demo.cpp`, o `ShowDemoWindow()`) tem e o **modo
+imediato do iGUI não exprime**. Cada linha desta lista corresponde a um
+`gallery::reportGap()` em [GalleryIgui.cpp](./GalleryIgui.cpp), que é a fonte de
+verdade: o espelho regista a lacuna no sítio exato onde ela aparece.
+
+Para tirar a lista atualizada do binário:
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DIGUI_BUILD_COMPARE_GALLERY=ON \
+      -DIGUI_BUILD_SDL2_DEMO=ON -DIGUI_BUILD_OPENGL_BACKEND=ON -DIGUI_BUILD_FONT=ON \
+      -DIGUI_BENCH_IMGUI_DIR=/caminho/para/imgui
+cmake --build build --target igui_compare_gallery
+./build/examples/compare_gallery/igui_compare_gallery --hidden --frames=120 --open-all
+```
+
+O `--hidden` corre sem janela visível; o `--open-all` abre todas as secções e
+sub-secções (sem ele só se vê o que estiver aberto, e as lacunas das secções
+fechadas não são registadas). O resumo no fim imprime as lacunas e a geometria dos
+dois lados: na revisão atual são **37 lacunas** contra 319 itens submetidos pelo
+espelho. O número só conta as seccoes desenhadas no frame (com o `--open-all`),
+por isso uma lacuna que se fecha e uma lacuna nova que aparece no mesmo sítio
+trocam entre si; o que interessa é a tabela e a linha impressa no fim.
+
+Para uma secção de cada vez - é assim que se põe lado a lado o mesmo ecrã - o
+`--only=NOME` desenha **só** essa secção, no topo e sem o header dela
+(`--only=Combo`, `--only="Tables & Columns"`, `--only=Tabs`), que é o que dispensa
+andar à roda à procura dela; o `--open=NOME` abre só essa com as outras por cima
+(`--open=Combo`, `--open="Tables & Columns"`), e o `--click=X,Y` carrega uma vez no
+painel do iGUI nesse ponto, para os popups (que só abrem com rato) aparecerem numa
+captura: `--open=Combo --click=150,405 --frames=14 --screenshot=combo.png`.
+
+A lista impressa cobre **as secções que foram desenhadas** naquele frame: a
+lacuna é registada no sítio do código onde ela aparece, e uma secção fechada não
+corre esse código. Com tudo aberto (como o demo abre) a lista fica completa - e
+este documento é o levantamento exaustivo, independente do que está aberto.
+
+## Como ler a tabela
+
+- **existe** — há um widget do iGUI que faz o mesmo (por vezes com outro nome).
+- **parcial** — há algo que serve, mas falta a parte indicada.
+- **não existe** — não há equivalente; no espelho fica uma nota `[iGUI: nao existe]`
+  e a lacuna entra no relatório.
+
+## Texto
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `Text` / `TextUnformatted` | `label` | existe |
+| `"texto##id"` / `"##id"` num rótulo | `visibleLabel` (id com a string toda, desenha só o que vem antes do `##`) | existe; um `label("a##b")` desenha `a##b` (o `Text` do ImGui também não trata de `##`) |
+| `TextColored` / `TextV` | `textColored` (item próprio, com o layout a avançar) | existe |
+| `LabelText` | `label` + `sameLine` + `label` | parcial: não é um item próprio |
+| `TextDisabled` | `textDisabled` (usa `theme.textDisabled`) | existe |
+| `TextWrapped` / `PushTextWrapPos` | `textWrapped` (largura opcional) | parcial: sem stack de wrap positions |
+| `Bullet` / `BulletText` | `bulletText` (com wrap, o segundo alinha sob o primeiro) e `TreeStyle::bullet` no `treeNode`/`collapsingHeader` | existe (o bullet de um nó de árvore é o ponto em vez da seta, e a linha abre e fecha na mesma) |
+| `SeparatorText` | `separatorText` | existe |
+| `SetTooltip` | `tooltip` | existe |
+
+## Botões e toggles
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `Button` / `SmallButton` / `InvisibleButton` | `button` / `smallButton` / `invisibleButton` | existe |
+| `ArrowButton` | `arrowButton` | existe: quadrado com a seta para um dos quatro lados, e o rótulo é um id ("##left") |
+| `Checkbox` | `checkbox` | existe: a caixa e o rótulo à frente são o mesmo item para o ponteiro, como no ImGui |
+| `CheckboxFlags` (bitfield int/unsigned) | `checkboxFlags` | existe (`unsigned`; o desenho e o clique são os do `checkbox`) |
+| `RadioButton` | `radioButton` | existe |
+| `ImageButton` / `SmallImageButton` | `imageButton` / `smallImageButton` | existe |
+| `Selectable` com flags | `selectable(label, selected, width)` + `isItemDoubleClicked()` | parcial: o duplo clique existe (é o `AllowDoubleClick` + `IsMouseDoubleClicked`) e o desativado vem do `beginDisabled`; faltam o `SpanAllColumns`, o `AllowOverlap` e o alinhamento à direita |
+
+## Sliders, drags e inputs numéricos
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `SliderFloat` / `SliderInt` | `sliderFloat` / `sliderInt` | existe |
+| `VSliderFloat` / `VSliderInt` | `vSliderFloat` / `vSliderInt` | existe (o `fader` é outra coisa: um controle de mistura com cap rígido) |
+| `SliderAngle` | `sliderAngle` | existe (o valor em radianos, o intervalo e o texto em graus, `"%.0f deg"` por omissão) |
+| `SliderFloat2/3/4`, `SliderInt2/3/4` | `sliderFloat2/3/4`, `sliderInt2/3/4` | existe |
+| `DragFloat` / `DragInt` | `dragFloat` / `dragInt` | existe |
+| `DragFloat2/3/4` | `dragFloat2/3/4` | existe |
+| `DragInt2/3/4` | `dragInt2/3/4` | existe |
+| `DragScalar`/`SliderScalar`/`InputScalar` (qualquer tipo: S8..U64, com `format`) | `sliderScalar`/`dragScalar`/`inputScalar` com `ScalarType` | existe: o valor por ponteiro e o tipo do `ImGuiDataType` (s8..u64, float, double), com o formato de cada tipo por omissão e o formato escrito à mão a valer (`"%04X"`, `"%.10f grams"`). O valor por dentro é um double, por isso um s64/u64 acima de 2^53 perde os bits de baixo - o ImGui perde-os também (o `FLOATTYPE` dele é double nestes dois tipos). O que falta: os botões de passo do `InputScalar` |
+| `DragFloatRange2` / `DragIntRange2` | `dragFloatRange2` / `dragIntRange2` | existe: duas caixas (mínimo e máximo) com o rótulo no fim, cada uma limitada pela outra e pelo tecto/fundo da gama |
+| Flags de drag/slider | `SliderFlags::Logarithmic`, `WrapAround`, `NoInput`, `AllowOutOfRange` | parcial: existem estes quatro (o `AllowOutOfRange` é o contrário do `ClampOnInput`/`AlwaysClamp` do ImGui: aqui o valor escrito é limitado ao intervalo por omissão). Faltam o `ClampZeroRange` e o `NoRoundToFormat`/`NoSpeedTweak` (não há arredondamento ao formato nem escalas de teclado) |
+| `ImGuiSliderFlags_ClampOnInput` / `AlwaysClamp` (o Ctrl+clique pode sair do intervalo) | `AllowOutOfRange` | existe, com outro nome: no ImGui é o comportamento por omissão e o flag é o que limita |
+| `InputFloat` / `InputFloat2/3/4` | `inputFloat` / `inputFloat2/3/4` | existe |
+| `InputInt` | `inputInt` | existe |
+| `InputInt2/3/4` | `inputInt2/3/4` | existe |
+| `InputDouble` | `inputDouble` | existe |
+| `InputScalar(N)` | — | **não existe** (a versão vetorial para os tipos que não são float/int: o `inputScalar` é de um valor) |
+| `SliderFloat`/`DragFloat`/`InputFloat` com formato próprio (`%.3f`, `"%.10f grams"`, `"%04X"`) | `format` (o do printf) em todas as numéricas | existe: vale para o valor desenhado e para o que se escreve no campo (o `%04X` mostra e lê em hexadecimal), com o parse a recusar o que não é um número (`nan`, `inf`) e a aceitar a legenda do formato (o `1.5 grams`) |
+| — | `stepperInt` | (extra do iGUI) |
+
+## Texto editável
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `InputText` | `inputText` | existe |
+| `InputTextMultiline` | `inputTextMultiline` | existe |
+| `InputTextWithHint` | `inputTextWithHint` (a dica sai na cor do texto desativado enquanto o campo está vazio) | existe |
+| `CallbackCharFilter`, `CallbackCompletion`, `CallbackHistory`, `CallbackResize` | — | **não existe** |
+| `ImGuiInputTextFlags_*` | `InputTextFlags` (`CharsDecimal`, `CharsHexadecimal`, `CharsScientific`, `CharsUppercase`, `CharsNoBlank`, `ReadOnly`, `Password`, `AllowTabInput`, `EnterReturnsTrue`) | parcial: existem estes nove - os Chars* filtram o que se escreve e o que se cola (o valor que já lá estava não é mexido), o `Password` esconde o que lá está e o `EnterReturnsTrue` devolve o Enter. Faltam o `NoUndoRedo`/`AutoSelectAll` (não há seleção dentro do campo, só o cursor) e o `ParseEmptyRefVal`/`DisplayEmptyRefVal` |
+| `InputText` com `Hint` e seleção por teclado | parcial | o caret/seleção existem; a navegação por teclado completa não |
+
+## Combos, listas e seleção
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `Combo` (lista de strings) | `comboBox` | existe |
+| `BeginCombo`/`EndCombo` (conteúdo próprio: árvore, imagens, multi-seleção) | `beginCombo`/`endCombo` | existe: o popup leva o que o chamador submeter entre os dois (o cursor do layout fica dentro dele e `availableWidth()` passa a ser a largura do popup). A largura é a do cabeçalho e cresce com o conteúdo; a altura é a do conteúdo até `visibleItems` linhas (8 por omissão, como o `HeightRegular` do ImGui) |
+| `Combo` com filtro de pesquisa | `beginCombo` + `inputText` | existe: o filtro é conteúdo do popup, submetido pelo chamador (a galeria faz isso) |
+| `ImGuiComboFlags_*` (NoArrowButton, NoPreview, WidthFitPreview, HeightSmall/Regular/Largest) | — | **não existe**: sem flags |
+| Scroll dentro do popup de um combo (o ImGui mostra 8 linhas e rola) | `beginCombo(...)` | existe: o popup mostra `visibleItems` linhas (8 por omissão, o `HeightRegular`), a roda do rato e a barra à direita rolam a lista, e o que não cabe é cortado. Com um `beginChild` lá dentro quem rola é o child (com a barra dele), como no "Options" do menu de ficheiros do demo |
+| `SetItemDefaultFocus` (a lista abre no item escolhido) | `setItemDefaultFocus` | existe, para o popup de um combo: só vale na abertura, e rolar à mão desiste dele |
+| `ListBox` (uma entrada) | `listBox` | existe |
+| `ListBox` com seleção múltipla | — | **não existe** |
+| `BeginMultiSelect`/`EndMultiSelect` (clique, Ctrl, Shift, Ctrl+A, Escape) | `beginMultiSelect`/`endMultiSelect` | existe: a seleção é da aplicação (um `Span<bool>`, um por item) e o bloco só lhe aplica o que o rato e as teclas pediram. Dentro do bloco cada `selectable` é um item, pela ordem em que é submetido (o `MultiSelectFlags` tem `SingleSelect`, `NoSelectAll`, `NoRangeSelect` e `ClearOnEscape`) |
+| `ImGuiMultiSelectIO` (os pedidos `SetAll`/`SetRange`/`BeginClear`/...) e `SetNextItemSelectionUserData` (ids que não são índices) | — | **não existe**: sem IO de pedidos e sem ids de item |
+| `ImGuiSelectionBasicStorage` / `ImGuiSelectionExternalStorage` | — | **não existe**: quem guarda a seleção é a aplicação |
+| `IsItemToggledSelection` / `IsItemSelected` | `isItemSelected`/`isItemToggledSelection` | existe (do último item submetido no bloco) |
+| Os ~12 exemplos do demo (clipper, déleção, dual list box, tabela, checkboxes, múltiplos escopos, tiled assets browser, árvores, avançado) e o box-select (arrastar) | — | **não existe**: sem clipper, sem auto-select na navegação, sem box select |
+
+## Árvores, headers, tabs
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `TreeNode` | `treeNode` | existe |
+| `TreeNodeEx` com flags (`Selected`, `DefaultOpen`, `OpenOnArrow`, `SpanAvailWidth`, `SpanFullWidth`, `Framed`, `Leaf`, `Bullet`, `NavLeftJumpsToParent`) | `TreeStyle` (bullet, selected, openOnArrow, spanAvailWidth) no `treeNode`/`collapsingHeader`, `TreeItemStyle` no `treeItem` | parcial: o `bullet`, o `selected`, o `openOnArrow` e o `spanAvailWidth` existem; não há `framed`, `spanFullWidth` nem `navLeftJumpsToParent`, e o `defaultOpen` não se aplica (o estado de aberto/fechado é da aplicação) |
+| `TreePush`/`TreePop`, `Indent`/`Unindent` | `indent`/`unindent` | existe |
+| `CollapsingHeader` | `collapsingHeader` | existe |
+| `CollapsingHeader` com botão de fecho (`bool* p_open`) | `collapsingHeader(label, expanded, open)` | existe (o x fecha-o e o header deixa de ser desenhado) |
+| `CollapsingHeader` com bullet | `collapsingHeader(label, expanded, TreeStyle)` | existe (e o grupo que se fecha sozinho faz-se com o `bool &open` de sempre) |
+| `BeginTabBar`/`BeginTabItem`/`EndTabItem`/`EndTabBar` | `beginTabBar`/`beginTabItem`/`endTabItem`/`endTabBar` (o `tabBar(label, indice, itens)` antigo continua a ser a faixa com índice) | existe: a barra é um contentor, cada tab desenha-se e **só a escolhida** abre o conteúdo (que vai até ao `endTabItem`), o que está escolhido é da barra (pelo id) e sobrevive ao frame, a tab de um documento que deixe de ser submetida desaparece com ele (e a barra escolhe a primeira), e o `TabItemFlags::SetSelected`/`UnsavedDocument` existem. Um clique realça a tab já neste frame e o conteúdo dela é o do frame seguinte (a regra do ImGui: quem abre o conteúdo neste frame é quem estava escolhido no início dele) |
+| Tab com botão de fechar / `ImGuiTabItemFlags_SetSelected`, `UnsavedDocument` | `beginTabItem(label, bool *open, flags)` | existe (o `x` fecha e o ponto do `UnsavedDocument`; o botão do meio também fecha, e é o `NoCloseWithMiddleMouseButton` que o desliga) |
+| Flags de tab (`Fitting`, `AutoSelectNewTabs`, `TabListPopup`, `TabListButton`, `NoReorder`) | `TabBarFlags` (`Reorderable`, `AutoSelectNewTabs`, `Fitting`, `NoCloseWithMiddleMouseButton`, `TabListPopupButton`, `DrawSelectedOverline`) | parcial: seis existem - o `Fitting` divide a faixa que sobra pelas tabs, o `Reorderable` troca a ordem com um arrasto (vale a partir do frame seguinte, que é quando as posições são recalculadas), o `TabListPopupButton` é o botão da lista à esquerda da barra, e o `DrawSelectedOverline` é o traço por cima da escolhida. Falta o `TabListButton` (o botão que lista as tabs numa janelinha própria) e o `NoReorder` (que não faz sentido à parte do `Reorderable`) |
+| `TabItemButton` com `TabItemFlags_Leading`/`Trailing` | `tabItemButton(label, flags)` + `TabItemFlags::Leading`/`Trailing` | existe: o botão ocupa o lugar de uma tab na banda da ponta que os flags pedem (as tabs Leading encostam-se à direita dos botões Leading, as Trailing à esquerda dos botões Trailing, e as do meio ficam entre as duas bandas), devolve o clique e não escolhe nada - o "+" e o "?" da barra do demo são isto | |
+
+## Tabelas
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `BeginTable`/`TableNextColumn`/`TableHeadersRow` | `beginTable`/`tableNextColumn`/`tableHeader` | existe (o `tableHeader` faz o sort) |
+| `TableSetupColumn` com pesos e resize | `beginTable(id, weights)` | existe: os pesos são por coluna, e com pesos mutáveis (`Span<float>`) o grip do cabeçalho redimensiona (e escreve os pesos de volta) |
+| `ImGuiTableFlags_Resizable` / `Sortable` / `Borders` / `RowBg` | pesos mutáveis / `tableHeader(label, sortColumn, sortAscending)` / `TableStyle::borders` / `TableStyle::alternateRows` | existe, com outra cara (não são flags, e sim a API) |
+| `ImGuiTableFlags_Hideable` + o menu de contexto do cabeçalho | `beginTable(id, weights, columnVisible)` + `tableHoveredColumn()` + `openPopup` | existe: a coluna escondida não ocupa largura, as seguintes fecham o espaço dela e o `tableNextColumn()` devolve false para a célula dela ser saltada. O menu é do chamador (a galeria faz o do demo, com um checkbox por coluna) |
+| `ImGuiTableFlags_Reorderable` (arrastar o cabeçalho troca a ordem das colunas) | `TableStyle::reorderable` + `tableColumnIndex()` | existe: o que anda é a coluna do modelo (o peso e a visibilidade continuam a ser dela, a largura segue-a), a ordem é guardada pelo id da tabela e sobrevive ao frame (uma tabela deixa de ser reordenável quando o número de colunas muda), e o cabeçalho de destino fica realçado enquanto se arrasta |
+| `ImGuiTableFlags_ScrollY` + `TableSetupScrollFreeze` (linhas presas) | `TableStyle::scrollY` + `height` + `freezeRows` | existe: a tabela tem uma altura fixa, as linhas rolam dentro dela (roda + barra arrastável) e as primeiras `freezeRows` ficam presas no topo (`freezeRows = 1` é o cabeçalho; a linha 0 é o cabeçalho). O que rola é cortado no fundo da tabela e por baixo das linhas presas |
+| `ImGuiTableFlags_ScrollX` + `FreezeColumns` | `TableStyle::scrollX` + `innerWidth` + `freezeCols` | existe: as colunas passam a ter a largura pedida (`innerWidth` dividida pelos pesos - o que não couber na tabela rola dentro dela, com a roda horizontal e com uma barra arrastável em baixo) e as primeiras `freezeCols` ficam presas à esquerda, que é o que corta o que rola. É a diferença de fundo para o ImGui: lá a largura é de cada coluna, aqui o peso é uma fatia da largura disponível, por isso rolar na horizontal precisa de uma largura própria |
+| `ImGuiTableFlags_SizingFixedFit` (as colunas do tamanho do conteúdo) | `TableStyle::sizingFixedFit` | existe: cada coluna fica com a largura do maior conteúdo dela (o cabeçalho incluído) mais a margem da célula, medida no frame anterior - o mesmo contrato do resto, porque o conteúdo de uma célula só se sabe depois de a submeter. A largura é guardada por tabela (pelo id). O que falta é o redimensionamento pelo grip com o FixedFit (o grip mexe nos pesos) |
+| `ContextMenuInBody`, `NoPad`, `ImGuiTableColumnFlags_*` (política por coluna) | — | **não existe** |
+| Tabelas aninhadas, tabelas com header agrupado | — | **não existe** |
+| — | `beginVirtualTable` | (extra do iGUI) |
+
+## Plots
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `PlotLines` (overlay, escala, cores do tema) | `plotLines` | existe (decimado a uma coluna por pixel, desenhado como uma só fita, destaca a amostra sob o ponteiro, devolve o índice) |
+| `PlotHistogram` | `plotHistogram` | existe (barras a partir da linha do zero, que sobe para o topo com escalas negativas, desenhadas numa só chamada) |
+| As variantes do demo (dados animados, `PlotEx` interna) | — | parcial: os dados são sempre `const float *` + contagem (sem *getter* nem *stride*), e a escala automática é tudo-ou-nada |
+| — | `gradientEditor`, `curveEditor`, `timeline`, `sequencer` | (extras do iGUI, noutro domínio) |
+
+## Cores
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `ColorEdit3` | `colorEdit` (sempre RGBA) | parcial: só 4 componentes |
+| `ColorEdit4` | `colorEdit` | existe |
+| `ColorPicker4` | `colorEdit` com altura grande | parcial |
+| `ColorButton` | `colorButton` (com o rótulo ao lado, como o `colorEdit`) | existe |
+| Flags de color edit (`AlphaBar`, `AlphaPreview`, `InputRGB/HSV/HEX`, `Sub`, `NoInputs`, `NoLabel`, `PickerHueWheel`/`Bar`/`Triangle`/`Square`) | — | **não existe** |
+| `SetColorEditOptions` | — | **não existe** |
+| Palette widgets | — | **não existe** |
+
+## Barras de progresso
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `ProgressBar` (sem texto) | `progressBar` | existe |
+| `ProgressBar` com overlay de texto | `progressBar(value, maximum, bounds, overlay)` | existe (o overlay sai centrado por cima da barra) |
+| Barra indeterminada (`fraction < 0`) | `progressBar` com valor negativo | existe (uma faixa de 20% atravessa-a com o tempo do contexto) |
+
+## Tooltips
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `SetTooltip` (texto) | `tooltip(text)` | existe |
+| `BeginTooltip`/`EndTooltip` com widgets dentro | `beginTooltip`/`endTooltip` | existe (a caixa mede-se pelo conteúdo; nada lá dentro reage ao rato, para não roubar o hover a quem a pediu) |
+| `BeginItemTooltip`/`SetItemTooltip` | `tooltip`/`beginTooltip` logo depois do widget | parcial: as duas funcionam sobre o último item, sem um pedido explícito para um id |
+| Atraso configurável por item, flags de hover | `setTooltipDelay` (global) | parcial |
+
+## Popups e modais
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `OpenPopup`/`BeginPopup`/`EndPopup` (ids, posição, tamanho) | `openPopup(id, posicao, tamanho)`/`beginPopup(id)`/`endPopup` | existe: o popup abre onde foi pedido (encostado ao ecrã quando não cabe, como o `FindBestWindowPosForPopup`), a largura é pedida e a altura medida pelo corpo do frame anterior, o clique fora e o Escape fecham-no, e o corpo leva a margem da janela (o `WindowPadding`) - mais o `closeCurrentPopup` e o `isPopupOpen` |
+| Popups aninhados (uma pilha de popups) | a pilha de `openPopup`/`beginPopup` | existe: um popup aberto de dentro de outro fica **por cima** dele sem o fechar (é o "Stacked Popup" do demo), só o de cima recebe o ponteiro e o Escape, um clique dentro do pai mas fora do filho fecha só o filho, e um clique fora de todos fecha a pilha toda. Quem não for submetido num frame sai da pilha (como tudo no modo imediato), e a `beginDialog` continua a ser a caixa modal de conteúdo livre |
+| `MenuItem`/`BeginMenu` dentro de um popup ou de uma janela | `menuItem`/`menuCheckbox`/`menuSeparator`/`beginSubMenu` | existe: num popup os itens são linhas do layout dele (uma faixa da altura do item, com o mesmo realce e o atalho à direita), e num menu continuam a ser as faixas encostadas às bordas; o submenu abre ao lado do item, com a caixa por cima do popup |
+| `BeginPopup(..., ImGuiWindowFlags_MenuBar)` (um popup com barra de menus) | `beginMenuBar(rect)` dentro do `beginPopup` | existe (a barra leva o rect do chamador, como em todo o iGUI), e um clique nos itens desse menu não fecha o popup: o menu é dele, e os itens saem fora da caixa do popup |
+| `BeginPopupModal`/`EndPopup`/`CloseCurrentPopup` | `beginPopupModal(titulo, p_open)`/`endPopup`/`closeCurrentPopup` | existe: abre-se com o `openPopup` do título, sai centrado, com barra de título própria (e um X quando o chamador dá o `bool *open`), desenhado por cima de todas as janelas e com o resto da interface atrás de um véu; fecha com o Escape, o X ou o `closeCurrentPopup` - e **não** fecha com um clique fora (é o que o distingue de um popup, e o que trava os atalhos enquanto está aberto). A `messageBox` e a `beginDialog` continuam a ser as caixas de OK/Cancelar |
+| `BeginPopupContextItem`/`Window`/`Void` | `beginContextMenu(id, rect)` | parcial: precisa do rect à mão |
+| `BeginTooltip` como popup | — | **não existe** |
+
+## Menus
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `BeginMenuBar` (dentro da janela) | `beginMenuBar(rect)` | existe: a barra é um item do layout (o cursor fica abaixo dela, como no grupo que o ImGui abre lá dentro), com rect e hover do item e sem id |
+| `BeginMainMenuBar` (barra da aplicação) | `beginMainMenuBar`/`endMainMenuBar` | existe: uma janela sem nada à volta no topo do ecrã, com a ordem de cima (é o que a desenha por cima das outras e lhe dá o ponteiro antes delas), e com os `beginMenu`/`menuItem` de sempre lá dentro. A altura que ocupa é o `mainMenuBarHeight()` (a aplicação tem de deixá-la livre, como o work area do ImGui) |
+| `BeginMenu`/`EndMenu`/`BeginSubMenu` | `beginMenu`/`endMenu`/`beginSubMenu` | existe |
+| Um menu com widgets lá dentro (o "Options" do menu de ficheiros do demo: um child a rolar, um slider, um input e um combo dentro do menu) | `beginMenu`/`beginSubMenu` | existe: o corpo de um menu aberto é um contentor de layout (o cursor, a largura e o clip são os do popup), por isso um slider, um child ou um combo lá dentro ficam no menu e o item seguinte cai por baixo deles. Como no ImGui, o id do menu entra na pilha de ids (o mesmo rótulo em dois menus são widgets diferentes) |
+| `MenuItem` com atalho (`"Open", "Ctrl+O"`) e checkbox/selected | `menuItem(label, shortcut, enabled, selected)` / `menuCheckbox` | existe: o atalho é desenhado à direita, em baixo-relevo, e conta para a largura do popup; quem o trata é a aplicação (é texto) |
+| `MenuItem` com enabled/disabled | `menuItem(label, enabled)` | existe |
+| `BeginPopupMenu`/`ImGuiPopupFlags`, `BeginMenu` com `enabled` | parcial | |
+
+## Drag & drop
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `BeginDragDropSource`/`EndDragDropSource` | `beginDragSource(id, type, data, preview, bounds)` | parcial: não há previews nem flags (só um texto) |
+| `SetDragDropPayload` (payload com tipo e flags) | `beginDragSource` (id + tipo + valor) | parcial: sem flags de condição |
+| `BeginDragDropTarget`/`AcceptDragDropPayload` | `acceptDragDropTarget(tipo, rect, payload)` | parcial |
+| `ImGuiDragDropFlags_*` (SourceNoPreviewTooltip, AcceptBeforeDelivery, PayloadAutoExpire, ...) | — | **não existe** |
+| Os exemplos do demo (reordenar, copiar/trocar, arrastar para reordenar) | — | **não existe** |
+
+## Blocos desativados
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `BeginDisabled`/`EndDisabled` | `beginDisabled`/`endDisabled` | existe (aninhável; os widgets ficam sem interação e o desenho é atenuado no `DrawList`, sem acumular a atenuação) |
+| `IsItemDisabled`, `PushItemFlag(Disabled)` | `isDisabled()` (diz se está dentro do bloco), `isItemDisabled()` | existe: `isItemDisabled` responde pelo último item; as flags por item (`PushItemFlag`) não existem |
+
+## Layout e scrolling
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `SameLine`, `Spacing`, `Dummy`, `Indent`, `Unindent`, `NewLine` | `sameLine`, `spacing`, `dummy`, `indent`, `unindent`, `newLine` | existe |
+| `BeginChild`/`EndChild` | `beginChild(id, altura, border, largura)` | parcial |
+| `ImGuiChildFlags_*`: Borders, ResizeX/Y, AutoResize, AlwaysAutoResize, NavFlattened | — | **não existe** |
+| `BeginGroup`/`EndGroup` | `beginGroup`/`endGroup` | existe: o bloco é um item lá fora (a margem muda lá dentro, `sameLine` a seguir salta o bloco todo), tem rect e responde ao hover, sem id nem clique (o `beginPropertyRow` continua a ser a linha rótulo/valor alinhada) |
+| A altura de uma linha é a do item mais alto dela | `LayoutState::lineTop`/`lineHeight` | existe (era a do último item, o que puxava a linha seguinte para cima quando o último item de um `sameLine` era mais baixo) |
+| `Columns`/`BeginColumns` (API antiga) | — | **não existe** |
+| `ImGuiListClipper` | `beginVirtualList` (+Table/Tree) | parcial: exige `first/last` explícitos |
+| `PushItemWidth`/`PopItemWidth`/`SetNextItemWidth`/`CalcItemWidth` | `pushItemWidth`/`popItemWidth`/`setNextItemWidth`/`calcItemWidth` | existe (uma guarda de profundidade: um `pushItemWidth` dentro de outro bloco herda a largura de fora em vez de a repor) |
+| `AlignTextToFramePadding` | `alignTextToFramePadding` | existe: desloca o próximo texto (o `label`, o `textDisabled` e o `textColored`), não o cursor - o widget da mesma linha fica onde estava |
+| `SetCursorPos`/`GetCursorPos`/`GetContentRegionAvail` | `setCursor`/`cursor`/`availableWidth`/`availableHeight` | existe |
+| Scroll horizontal, scrollbar customizada | parcial | |
+| `GetWindowPos/Size/Width/Height`, `SetNextWindowSizeConstraints` | `windowBounds` | parcial |
+| `ImGuiWindowFlags_NoTitleBar` | `WindowOptions::titleBar = false` | existe |
+| `ImGuiWindowFlags_NoMove` / `NoResize` | `WindowOptions::move` / `resize` | existe |
+| `ImGuiWindowFlags_NoSavedSettings` | `WindowOptions::saveSettings` | existe |
+| Geometria fixa por frame (`SetNextWindowSize(..., Always)`) | `WindowOptions::fixedBounds` | existe |
+| `ImGuiWindowFlags_NoScrollbar/NoScrollWithMouse`, `AlwaysAutoResize`, `NoBackground`, `NoBringToFrontOnFocus`, `NoInputs`, `NoFocusOnAppearing`, `MenuBar`, `NoDecoration`, `NoCollapse`, `NoNav*`, `NoDocking` | — | **não existe**: a janela é redimensionável e movível por omissão, e o resto dos flags não tem interruptor |
+
+## Fontes
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `PushFont`/`PopFont` com vários tamanhos | `pushStyleVar(&Theme::fontSize, x)` (ou `setNextFontSize`) | existe: o `FontAtlas` coze uma face e desenha-a **escalada** pelo tamanho lógico (ver `FontAtlas::appendText`), por isso um tamanho diferente sai sem atlas novo - nítido até ~±50%, esbatido muito além disso |
+| `SetWindowFontScale` | o mesmo `pushStyleVar` (vale para o bloco todo, widgets incluídos) | existe |
+| Fonte por bloco (`PushFont(ImFont*)`) | `pushFont(FontId)` / `popFont()` | existe: a face leva o tamanho de fabrico dela (a face nova não sai esticada), a pilha é de 8 níveis, um push sem pop vale só para o frame dele, e um `pushStyleVar(&Theme::fontSize, x)` por dentro continua a mandar no tamanho |
+| `AddFontDefault`/`AddFontFromMemoryTTF`, uma face por tamanho, tudo no mesmo atlas | `FontAtlas::loadFont(bytes, bakedSize, ranges)` | existe: o atlas reconstrói-se por inteiro com a face nova (o stb não guarda estado entre chamadas), por isso quem já tem a textura volta a subi-la com `pixels()` - é o que a aplicação faz uma vez, ao carregar as fontes |
+| `io.FontDefault` (o `ShowFontSelector` muda a fonte do interface todo) | `pushFont` para o frame todo, lido da escolha do frame anterior | existe (é o que a galeria faz: o combo da secção "Fonts" só vale a partir do frame seguinte, como no ImGui) |
+| `AddFontFromMemoryTTF` (uma fonte a partir de bytes) | `FontAtlas(bytes, ranges, w, h, bakedSize)` | existe (os bytes são validados antes de chegarem ao stb, que não se defende sozinho de um ficheiro que não seja fonte) |
+| `AddFontFromFileTTF` | o ficheiro é lido pela aplicação e passado como bytes | existe (não há leitura de disco dentro da biblioteca, que não tem sistema de ficheiros) |
+| Merge de ícones numa fonte, `GlyphRanges` por face | `FontAtlas::loadFont(bytes, size, ranges)` | os ranges são por face; o merge (uma face a acrescentar glifos a outra) **não existe** |
+| Métricas por face (`ImFont::Ascent`/`Descent`/`GetFontSize`) | `bakedSize(FontId)`, `lineHeight(FontId)`, `ascent(FontId)`, `measureText(FontId, ...)` | existe |
+| `ImFontAtlas` dinâmico (backend fornece as texturas: `ImTextureData`) | — | **não existe**: o atlas é construído uma vez e o backend carrega-o |
+| `ShowFontSelector`, `RasterizerDensity`, escala de fonte global | o combo é da aplicação (a galeria tem o seu, com `pushFont`), o tamanho é do tema | parcial: não há escala global de fonte nem densidade de rasterização - o tamanho é por bloco (`pushStyleVar`) ou por face (`pushFont`) |
+| Inspector do atlas (`ShowFontAtlas`: loader, compactar/esticar, rects empacotadas, glifos com zoom, realce de cada rect) | — | **não existe**: a aplicação lê `pixels()`, `width()`, `height()`, `faceCount()` e as métricas das faces, mas não há inspetor |
+
+## Imagens
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `Image` | `image(texture, w, h, uv, tint)` | existe |
+| `ImageButton` / `ImageWithBg` | `imageButton` | parcial: sem fundo próprio |
+| Texturas dinâmicas (`ImTextureRef`/`ImTextureData`, atlas gerido pelo backend) | `TextureId` + `addImage` | parcial: o backend cria a textura, não há protocolo de atualização incremental |
+
+## Estado do item e da janela
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `IsItemHovered/Active/Clicked/Focused/Edited/Disabled` | `isItemHovered/isItemActive/isItemClicked/isItemFocused/isItemEdited/isItemDisabled` | existe (o `LastItemData` do iGUI); há também `isHovered(id)`/`isClicked(id)` para widgets próprios |
+| `IsItemActivated/Deactivated/DeactivatedAfterEdit`, `IsItemToggledOpen`, `IsItemVisible`, `IsItemEnabled` | `isItemActivated/isItemDeactivated/isItemDeactivatedAfterEdit/isItemToggledOpen/isItemVisible` | existe, menos o `IsItemEnabled` (aqui o `beginDisabled` corta tudo o que está dentro e o `isItemDisabled` diz que o último item o está) |
+| `GetItemRectMin/Max/Size`, `GetItemID` | `itemRect()`, `itemId()` | existe |
+| `GetItemFlags` | — | **não existe** |
+| `IsItemHovered` com flags (`Delay`, `Stationary`, `AllowWhenBlockedBy*`, `AllowWhenDisabled`, `RectOnly`) | `isItemHovered(ItemHoverFlags)` | existe: `Delay`, `Stationary`, `AllowWhenBlockedByActiveItem`, `AllowWhenBlockedByPopup` e `RectOnly` (falta o `AllowWhenDisabled`, que aqui é o `beginDisabled` a cortar tudo) |
+| `IsItemHoverable`, `SetItemAllowOverlap`, `SetNextItemAllowOverlap` | — | **não existe** |
+| `IsWindowFocused/Hovered/Appearing/Collapsed`, `IsAnyItemHovered/Active` | `isWindowFocused`/`isWindowHovered`/`isWindowAppearing`, `wantsPointer`/`wantsKeyboard`/`isMenuOpen` | parcial: as três consultas de janela existem (`appearing` é "não estava no frame anterior"); falta o `Collapsed` (o iGUI não tem janelas recolhidas, tem minimizadas) e o `IsAnyItemHovered/Active` |
+| `IsRectVisible`, `GetWindowDrawList`, `ImDrawList` público | `draw*` do `Context` | parcial: o `DrawList` existe, mas a aplicação só desenha pelo Context |
+| `SetItemTooltip` | `tooltip` | parcial |
+
+## Teclado, rato e navegação
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `IsKeyPressed/IsKeyDown/IsKeyReleased/IsKeyChordPressed`, `GetKeyPressedAmount` | `isKeyPressed(key)`/`shortcut(key, ctrl, shift)` | parcial: por `KeyCode` (poucas teclas) |
+| `IsMouseDown/Clicked/DoubleClicked/Dragging/Hovered`, `GetMouseDragDelta`, `SetMouseCursor` | `isPointerButtonDown`, `pointerPosition`, `pointerPressedPosition` | parcial |
+| `NavEnableKeyboard/Gamepad`, tab order explícita, `SetKeyboardFocusHere` (pôr o foco de teclado num item por pedido) | — | **não existe**: o iGUI sabe *ler* o foco (`isItemFocused`, `setItemDefaultFocus` na abertura de um popup) e o `advanceFocus` interno anda com o Tab, mas não há API para o pôr num item, nem navegação por setas/gamepad, nem uma ordem de tab escolhida |
+| `WantCaptureMouse/Keyboard` | `wantsPointer`/`wantsKeyboard`/`wantsTextInput` | existe |
+| `SetNextFrameWantCaptureKeyboard/Mouse`, `Shortcut`, `SetKeyOwner` | — | **não existe** |
+| `GetIO`/`ImGuiIO` (config global, `ConfigFlags`, `BackendFlags`, `IniFilename`, `FontGlobalScale`, `MouseDrawCursor`, `ConfigWindowsMoveFromTitleBarOnly`, ...) | `Theme` + `FrameInfo` + `setWindowStatePath` | **não existe** objeto de configuração global |
+
+## Ferramentas do demo (não são widgets)
+
+| Demo do ImGui | iGUI | Estado |
+| --- | --- | --- |
+| `ShowMetricsWindow` (Debugger) | a janela `metricsWindow` do espelho (menu Tools) | existe: tempos, itens, vértices e draw calls do frame e a lista das lacunas - não tem a lista por janela | 
+| `ShowStyleEditor` | a janela `styleEditorWindow` do espelho (menu Tools) | existe: os 15 tamanhos e as 20 cores do `Theme` por slider/botão de cor, com picker, mais o "Revert" |
+| `ShowAboutWindow` | a janela `aboutWindow` do espelho (menu Tools) | existe |
+| `ShowUserGuide` (tabelas de atalhos) | — | **não existe** |
+| `ShowDebugLogWindow` | — | **não existe** |
+| `ShowIDStackToolWindow` | — | **não existe** |
+| `ShowStyleSelector` / `ShowFontSelector` | — | **não existe** |
+| Style vars (`PushStyleColor/Var`, `PopStyleColor/Var`) | `pushStyleColor(&Theme::campo)`, `pushStyleVar(&Theme::campo)` | existe (ponteiro para membro: qualquer campo do tema) |
+| `ImGuiStyle` mutável em runtime | `setTheme` + `theme()` | existe (global, com as style vars para o caso pontual) |
+| Config flags (`io.ConfigFlags`) | — | **não existe** |
+| Log/clipboard (`LogToTTY`, `LogToClipboard`) | clipboard pelo backend, sem log | parcial |
+
+## Apps de exemplo (menu "Examples" do demo)
+
+O demo abre catorze aplicações de exemplo pelo menu. O iGUI tem widgets que
+resolvem o mesmo problema, mas não como exemplos prontos:
+
+| App do demo | iGUI | Estado |
+| --- | --- | --- |
+| Main menu bar | `beginMenuBar` numa janela | parcial: falta uma barra de aplicação |
+| Assets Browser | `beginVirtualList`/`beginVirtualTable` | parcial: os widgets existem, não o exemplo |
+| Console | (widget de consola no modo retido) | parcial: só no modo retido |
+| Custom rendering | `draw*` do Context | parcial |
+| Documents | `beginDockSpace`/`beginDockPanel` | parcial |
+| Log | — | **não existe** |
+| Property editor | `beginPropertyRow` | parcial |
+| Simple layout | `beginChild` + `sameLine` | parcial |
+| Simple overlay | `draw*` + `wantsPointer` | parcial |
+| Auto-resizing window / Constrained-resizing / Fullscreen | `beginWindow` com bounds; sem auto-resize nem constraints | parcial |
+| Long text display | `label` sem wrap | parcial |
+| Manipulating window titles | `beginWindow(titulo)` | parcial |
+
+## E o que o iGUI tem que o demo do ImGui não tem
+
+Para a balança não ficar torta: no **modo imediato**,
+
+- docking de série (`beginDockSpace`/`beginDockPanel`, com arrastar tabs entre regiões
+  e layout guardado no `.ini`) — no ImGui é um ramo separado;
+- editor de código com realce de sintaxe (`codeEditor`) e as operações de clipboard
+  programáticas;
+- widgets de domínio: `fader`, `gizmo2D`/`gizmo3D`, `splitter`, `gradientEditor`,
+  `curveEditor`, `sequencer`, `timeline`;
+- vistas virtualizadas de série: `beginVirtualList`/`beginVirtualTable`/`beginVirtualTree`;
+- `messageBox`, `beginDialog` e `showToast` como chamadas de primeira linha;
+- estado das janelas no `.ini` (posição, tamanho, minimizada/maximizada, layout de
+  docking) com a mesma ideia do `imgui.ini`;
+- um `pushUndo`/`undo`/`redo` no contexto;
+- e, fora do modo imediato, uma segunda API retida sobre o mesmo motor — que traz
+  node editor, timeline, piano roll, thumbnail grid, file dialog, console, dock
+  panels e um motor de rasterização próprio.
+
+---
+
+# TODO
+
+Ordem sugerida: primeiro o que é barato e aparece em qualquer UI, depois o que
+precisa de estado novo no `Context`, e por fim o que mexe no motor de desenho ou
+na API de fontes. Cada item diz onde implementar.
+
+## P0 — barato, uso geral
+
+Feito nesta ronda (já no `main`, com testes em `tests/test_widgets.cpp`):
+
+- [x] **Opções de janela** — `Context::WindowOptions` com `titleBar`, `move`,
+      `resize`, `saveSettings` e `fixedBounds`; é o que permite a faixa de números
+      do espelho ser uma janela sem moldura, como a do ImGui
+      (`ImGuiWindowFlags_NoTitleBar|NoResize|NoMove`).
+- [x] **`displaySize()`** — o tamanho do ecrã que o frame trouxe, para uma janela
+      ou sobreposição se colocar sem saber quem a chamou.
+- [x] **Série e barras numa só primitiva** — `DrawList::addPolyline` (uma fita
+      por série, com a orla suave de fora a fora e nós em esquadria normalizada e
+      limitada) e `DrawList::addRectFilledBatch` (um reserva de índices e um teste
+      de clip para todas as barras). Os plots passaram a usá-las: 44.4 → 31.9 µs
+      na cena `plots` do benchmark, e 3836 → 2932 vértices.
+- [x] **Tooltip com widgets dentro** — `beginTooltip`/`endTooltip`: caixa medida
+      pelo conteúdo (via `LayoutState::contentExtent`), colocada ao lado do
+      ponteiro e virada para dentro quando não cabe, desenhada por cima das
+      sobreposições das janelas e por baixo dos modais. O corpo vai para uma lista
+      própria e o clip passa a ser o do ecrã, porque o tooltip sai fora da janela
+      onde foi submetido; dentro dele o `itemHovered`/`itemClicked` respondem
+      sempre que não, senão o hover saía ao dono e os dois piscavam.
+
+- [x] **`BeginDisabled`/`EndDisabled`** — contador no `Context`, interação cortada
+      no `itemHovered`/`itemClicked` e atenuação central no `DrawList`
+      (`setDisabledFade`), por isso vale para qualquer primitiva, incluindo as
+      widgets compostas.
+- [x] **Variantes de texto** — `textDisabled`, `textColored`, `textWrapped` e
+      `bulletText`, todas como itens de layout (medem e avançam o cursor), com
+      wrap por codepoint.
+- [x] **`progressBar` com overlay e indeterminada** — `overlay` centrado na barra
+      e `value < 0` para a faixa que anda com o tempo do contexto.
+- [x] **`colorButton`** — amostra clicável, com o rótulo ao lado.
+- [x] **`inputTextWithHint`** — a dica sai na cor do texto desativado enquanto o
+      campo está vazio.
+- [x] **Fecho nos headers** — `collapsingHeader(label, expanded, open)`: o `x`
+      fecha-o e o header deixa de ser desenhado.
+- [x] **`plotLines` / `plotHistogram`** — série `const float *` + contagem lida em
+      anel (`offset`), escala automática (`scaleMax <= scaleMin`) ou explícita,
+      decimação a uma coluna por pixel, destaque da amostra sob o ponteiro com
+      tooltip, overlay centrado e cores do tema (`plotBackground`, `plotLines`,
+      `plotHistogram`).
+
+Continua em falta neste nível:
+
+- [x] **Bullet nos headers e os flags do TreeNodeEx** (`TreeStyle` no `treeNode` e
+      no `collapsingHeader`): `bullet` (um ponto em vez da seta, aberto ou fechado, e
+      a linha abre e fecha na mesma), `selected` (a linha sai com a cor do
+      escolhido), `openOnArrow` (só a seta abre - o clique no rótulo fica a ser o
+      clique da linha, como no `treeItem`) e `spanAvailWidth` (o item apanha toda a
+      largura que sobra, em vez de só a que lhe foi dada). O `defaultOpen` não se
+      aplica: como no resto de modo imediato do iGUI, o estado de aberto/fechado é o
+      `bool` da aplicação.
+      *Onde:* `src/Gui.cpp` (`treeNode`, `collapsingHeaderImpl`), `include/igui/Gui.hpp`
+      (`TreeStyle`), `tests/test_item_status.cpp` (`test_tree_style`).
+      *Onde:* `src/Gui.cpp` (`treeNode`/`treeItem`), `include/igui/Gui.hpp`.
+- [x] **Convenção `##` nos rótulos.** "Gravar##ficheiro" desenha "Gravar" mas o
+      id é a string toda, e "##só-id" não desenha nada: é o que deixa dois widgets
+      com o mesmo texto visível terem estados separados, e o que faz um campo
+      numérico não ocupar largura com um rótulo (o demo usa `##` em todo o lado,
+      por isso é isto que agora faz os dois painéis escreverem o mesmo). Aplicado
+      em `visibleLabel()`, usado onde o rótulo é medido ou desenhado - e a medida
+      do *layout* também é a do texto visível (um `##id` faz o item ser só a
+      caixa, sem largura de rótulo).
+      *Onde:* `src/Gui.cpp` (`visibleLabel`), `tests/test_item_status.cpp`.
+
+## P1 — dimensão média
+
+- [x] **Flags de drag/slider**: `SliderFlags::Logarithmic` (a escala do logaritmo,
+      na pista e no arrasto), `WrapAround` (chegar a um fim passa para o outro),
+      `NoInput` (sem o editor de valor ao lado) e `AllowOutOfRange` (o valor escrito
+      à mão pode sair do intervalo).
+      *Onde:* `src/Gui.cpp` (`sliderValue`, `sliderFloat`, `dragFloat`,
+      `sliderNormFromValue`), `tests/test_numeric_input.cpp`.
+- [x] **As variantes numéricas**: `dragInt2/3/4`, `sliderFloat2/3/4`,
+      `sliderInt2/3/4`, `inputInt2/3/4`, `inputDouble`, o `vSliderFloat`/
+      `vSliderInt` e - na ronda do formato - o `format` (o do printf) em todas
+      elas, o `sliderAngle`, o `dragFloatRange2`/`dragIntRange2` e a família
+      escalar (`sliderScalar`/`dragScalar`/`inputScalar` sobre o `ScalarType`,
+      para os tipos que não são float nem int).
+      *Onde:* `src/Gui.cpp` (`sliderCore`/`dragCore`/`numericField`/
+      `setScalarValue`, `formatNumericValue`/`parseNumericValue`,
+      `sliderScalar`/`dragScalar`/`inputScalar`), `tests/test_numeric_input.cpp`
+      (`test_format_drives_display_and_parse`, `test_slider_angle`,
+      `test_drag_range2`, `test_scalar_types`,
+      `test_int_widgets_write_the_integer`).
+      *O que falta:* os botões de passo do `InputScalar`, o `InputScalar(N)`
+      vetorial e o `ClampZeroRange`/`NoRoundToFormat` dos flags.
+- [x] **Consultas do item anterior**: `isItemHovered`, `isItemActive`,
+      `isItemClicked`, `isItemFocused`, `isItemEdited`, `isItemDisabled`,
+      `itemRect` e `itemId` — o `LastItemData` do iGUI (`Context::ItemStatus`,
+      `item_`), preenchido por `itemHovered`/`itemClicked`/`sliderValue`/
+      `advanceLayout`. Um widget composto (o slider com o editor de valor, o drag
+      com o campo que abre) continua a ser um item: `keepItemStatus` funde o
+      sub-item principal depois de o editor correr.
+      *Onde:* `src/Gui.cpp` (`itemHovered`, `itemClicked`, `keepItemStatus`,
+      `sliderValue`, `advanceLayout`), `include/igui/Gui.hpp` (`ItemStatus`),
+      `tests/test_item_status.cpp`.
+- [x] **O resto das consultas do item**: `isItemActivated`/`isItemDeactivated`/
+      `isItemDeactivatedAfterEdit` (o "carregou, mexeu e largou" que um editor usa
+      para gravar), `isItemToggledOpen` (o nó abriu/fechou neste frame) e
+      `isItemVisible` (o rect ainda cai no clip). O `keepItemStatus` passou a
+      preservar as transições do item principal, senão o sub-item de um widget
+      composto (o campo de valor de um slider) apagava-as.
+      *Onde:* `include/igui/Gui.hpp` (`ItemStatus`), `src/Gui.cpp` (`itemClicked`,
+      `sliderValue`, `keepItemStatus`), `tests/test_item_status.cpp`.
+- [x] **Os flags do `IsItemHovered`**: `Delay` (tempo parado em cima do item, com o
+      `setHoverDelay`/`hoverDelay`), `Stationary` (o ponteiro não se mexeu),
+      `AllowWhenBlockedByActiveItem` (outro widget ativo a passar por cima) e
+      `AllowWhenBlockedByPopup` (um menu/combo aberto por cima), o `RectOnly` (basta
+      o rect, o clip não conta). O `itemHovered` passou a medir as condições uma a
+      uma em vez de responder só que não - é o que deixa um flag dispensar a que
+      bloqueia.
+      *Onde:* `include/igui/Gui.hpp` (`ItemHoverFlags`, `ItemStatus`), `src/Gui.cpp`
+      (`itemHovered`), `tests/test_item_status.cpp`.
+- [x] **Layout**: `newLine`, `pushItemWidth`/`popItemWidth`/
+      `setNextItemWidth`/`calcItemWidth`. Um `##id` também já não gasta largura de
+      rótulo, que era o que faltava para os campos do demo ficarem iguais.
+      *Onde:* `src/Gui.cpp` (`newLine`, `setNextItemWidth`, `calcItemWidth`,
+      `advanceLayout`), `tests/test_item_status.cpp`.
+- [x] **Um popup aberto é dono do ponteiro na sua área.** Antes perguntava-se "este
+      ponto está na área do popup?" e isso deixava passar o que está por baixo (o
+      rect de um widget de conteúdo também cai lá dentro): com um dropdown aberto
+      em cima de um botão, o botão ficava hot sob o menu. A pergunta passou a ser
+      "estamos a submeter os itens do popup?" (`activeMenu_`, `comboItemsSubmitted_`).
+      Com isto, a barra de menus passou a avançar o layout como uma barra do ImGui
+      (era o mesmo sintoma para quem não deixasse os 26 px à mão; os `spacing` de
+      compensação saíram dos exemplos).
+      *Onde:* `src/Gui.cpp` (`pointerBlockedByOpenPopup`, `endMenuBar`,
+      `setItemHoverRect`), `tests/test_item_status.cpp`.
+- [x] **`beginGroup`/`endGroup`**: um bloco que é um item para o layout de fora.
+      Dentro, a margem é a do grupo e as linhas são as do grupo; fora, o rect é a
+      caixa do que ficou lá dentro, o hover responde na caixa toda e não há id
+      (um clique é sempre de um widget lá dentro). No espelho é o que põe as
+      quatro colunas de sliders verticais do demo lado a lado.
+      *Onde:* `src/Gui.cpp` (`beginGroup`/`endGroup`, `advanceLayout`),
+      `include/igui/Gui.hpp` (`GroupState`), `tests/test_item_status.cpp`.
+      Com isto veio a regra da altura da linha (a do item mais alto), que é o que
+      o ImGui usa e o que faz a linha seguinte cair abaixo do bloco todo.
+- [x] **`alignTextToFramePadding`**: o próximo texto do bloco fica ao nível do
+      texto de um widget com moldura da mesma linha; o deslocamento é só do texto.
+      Junto com ele, o rótulo à frente da caixa do `checkbox`/`radioButton`/
+      `toggleSwitch` passou a fazer parte da área que responde ao ponteiro (era só a
+      caixa), como no ImGui.
+      *Onde:* `src/Gui.cpp` (`textFrameOffset`, `checkboxImpl`), `tests/test_widgets.cpp`.
+- [x] **`pushItemWidth` com pilha a sério** (8 níveis): antes era uma só guarda, e
+      o `popItemWidth` de dentro deixava em vigor a largura de dentro em vez de
+      voltar à de fora. Um `pushItemWidth(0)` herda a que estava.
+      *Onde:* `src/Gui.cpp` (`pushItemWidth`/`popItemWidth`/`calcItemWidth`),
+      `include/igui/Gui.hpp` (`LayoutState`), `tests/test_item_status.cpp`.
+- [ ] **Layout, o resto**: uma altura de linha "por omissão" configurável (o
+      `style.ItemSpacing` já existe).
+      *Onde:* `src/Gui.cpp` (`beginLayout`, `advanceLayout`, `sameLine`).
+- [x] **`beginCombo`/`endCombo`**: popup de conteúdo livre, com o `drawComboHeader`
+      a servir os dois (o `comboBox` e o `beginCombo`), o cursor do layout dentro do
+      popup e a medida do conteúdo a dar-lhe o tamanho no frame seguinte.
+      *Onde:* `src/Gui.cpp` (`beginComboImpl`/`endCombo`), `tests/test_item_status.cpp`.
+- [x] **Scroll dentro do popup de um combo**: o popup mede o conteúdo todo e mostra
+      `visibleItems` linhas (8 por omissão); a roda e uma barra à direita (arrastável)
+      rolam, o conteúdo é cortado pela área de dentro do popup, e a lista volta ao
+      topo quando se fecha. Com ele, o `setItemDefaultFocus` (que é o que faz a lista
+      abrir no item escolhido, como no demo).
+      *Onde:* `src/Gui.cpp` (`beginComboImpl`/`endCombo`/`setItemDefaultFocus`),
+      `tests/test_item_status.cpp`.
+- [x] **`beginChild` dentro do popup de um combo**: o `contentClip()` passou a ter o
+      popup como limite de partida e a cruzá-lo com a caixa do child (antes o child
+      *substituía* o clip da janela e o seu conteúdo aparecia fora do popup). O child
+      traz o cursor, o corte e a barra dele; o combo traz o popup, a rolagem e o
+      ponteiro.
+      *Onde:* `src/Gui.cpp` (`contentClip`), `tests/test_item_status.cpp`.
+- [x] **`menuItem` com atalho desenhado**: `menuItem(label, shortcut, enabled,
+      selected)` desenha o atalho à direita e soma-o à largura medida do menu.
+      *Onde:* `src/Gui.cpp` (`menuItemInternal`), `tests/test_item_status.cpp`.
+- [x] **`beginMainMenuBar`** (a barra da aplicação, que não pertence a nenhuma
+      janela): uma janela sem barra de título, sem mover nem redimensionar, com os
+      limites fixos no topo do ecrã, e com a ordem mais alta no fim de cada frame
+      (é o que a põe por cima das janelas e com o ponteiro antes delas).
+      *Onde:* `src/Gui.cpp` (`beginMainMenuBar`/`endMainMenuBar`), `tests/test_item_status.cpp`.
+- [ ] **Work area**: no ImGui as janelas são limitadas ao espaço que sobra da barra
+      (o `viewport->WorkOffsetMin.y`); aqui a aplicação tem de deixar a faixa livre
+      pelo `mainMenuBarHeight()`.
+      *Onde:* `src/Gui.cpp` (`beginWindow`, `mainMenuBarHeight`).
+- [x] **`arrowButton` e `checkboxFlags`** (bitfield): o `drawArrowGlyph` desenha a
+      seta para os quatro lados e o `checkboxFlags` troca um bit do `unsigned` que
+      lhe dão, com o desenho e o clique do `checkbox`.
+      *Onde:* `src/Gui.cpp` (`arrowButton`, `drawArrowGlyph`, `checkboxFlags`),
+      `tests/test_widgets.cpp`.
+
+## P2 — estruturas novas
+
+- [x] **Seleção múltipla** (`beginMultiSelect`/`endMultiSelect` com `SingleSelect`/
+      `NoSelectAll`/`NoRangeSelect`/`ClearOnEscape`, `isItemSelected`/
+      `isItemToggledSelection`): a seleção é um `Span<bool>` da aplicação e cada
+      `selectable` do bloco é um item, pela ordem em que é submetido. As mesmas
+      acções do ImGui (`MultiSelectItemFooter`): o clique limpa e escolhe, o Ctrl
+      troca um, o Shift escolhe o alcance, o Ctrl+Shift copia o estado do item de
+      origem, o Ctrl+A escolhe tudo e o Escape limpa.
+      *Onde:* `src/Gui.cpp` (`beginMultiSelect`/`applyMultiSelectClick`),
+      `tests/test_item_status.cpp`.
+- [ ] **O resto do modelo de seleção**: o `ImGuiMultiSelectIO` (pedidos) para quem
+      tem a seleção em ids e não em índices, o box select (arrastar uma caixa), o
+      auto-select na navegação por teclado, o `SetNextItemSelectionUserData`, o
+      `listBox` de seleção múltipla e o `beginVirtualList` como clipper.
+      *Onde:* `src/Gui.cpp` (`applyMultiSelectClick`), `src/Gui.cpp` (`listBox`).
+- [x] **Colunas escondidas** (`beginTable(id, weights, columnVisible)` +
+      `tableVisibleColumnCount()` + `tableHoveredColumn()`): a coluna escondida não
+      ocupa largura (as seguintes fecham o espaço dela, e o peso total já não conta
+      com ela), o `tableNextColumn()` devolve false para a célula ser saltada, e o
+      menu de contexto do cabeçalho faz-se com o `openPopup` + o
+      `tableHoveredColumn()`. Com isto, o `Resizable`/`Sortable`/`Borders`/`RowBg`
+      que já existiam (pesos mutáveis, `tableHeader` com sort, `TableStyle`), a
+      tabela do demo está coberta menos o que está na linha de baixo.
+      *Onde:* `src/Gui.cpp` (`beginTable`, `tableColumnWidth`, `tableNextColumn`,
+      `tableHeaderCell`), `tests/test_item_status.cpp`.
+- [x] **Colunas reordenáveis** (`TableStyle::reorderable` +
+      `tableColumnIndex()`): arrastar um cabeçalho para cima de outro muda a coluna do
+      modelo de sítio na ordem. Tudo o que é da coluna continua a ser do modelo (o
+      peso, a visibilidade e o que o chamador desenha, que pergunta qual é a coluna
+      em cada posição com o `tableColumnIndex()`); só a posição é que anda. A ordem
+      fica guardada pelo id da tabela, por isso sobrevive ao frame (e é o que faz o
+      arrasto, que ocupa vários frames, funcionar), e uma tabela cujo número de
+      colunas mude volta à identidade. O cabeçalho de destino fica realçado enquanto
+      se arrasta.
+      *Onde:* `src/Gui.cpp` (`beginTable`, `tableModelColumn`, `tableColumnAtX`,
+      `tableHeaderCell`), `tests/test_item_status.cpp` (`test_reorderable_table_columns`).
+- [x] **Uma tabela que rola sozinha** (`TableStyle::scrollY` + `height` +
+      `freezeRows`): a tabela passa a ter uma altura fixa e as linhas rolam dentro
+      dela, com a roda e uma barra arrastável no lado direito (a barra tira largura
+      às colunas, como num child), e as primeiras `freezeRows` linhas ficam presas no
+      topo - a linha 0 é o cabeçalho, por isso `freezeRows = 1` prende só ele. Tudo o
+      que rola é cortado por baixo das linhas presas e pelo fundo da tabela, e o clip
+      vai no item, por isso uma linha fora de vista não responde ao rato. A altura do
+      conteúdo e das linhas presas é a do frame anterior (é o mesmo caminho de um
+      child), e a contagem das linhas passou a ser a partir de 0 (o `++` que abre a
+      linha 0 deixou de contar duas vezes).
+      *Onde:* `src/Gui.cpp` (`beginTableScroll`, `tableRowClip`, `tableNextColumn`,
+      `endTable`, `contentClip`), `tests/test_item_status.cpp`.
+- [x] **As tabs a sério** (`beginTabBar`/`beginTabItem`/`endTabItem`/`endTabBar`): a
+      barra é um contentor e **só a tab escolhida** abre o conteúdo dela (os itens
+      vão para a área por baixo da linha das tabs, com a largura da barra e o clip
+      dela), e é o `endTabItem` que fecha e mede - a barra fica com a altura da linha
+      mais a do conteúdo. O que está escolhido é da barra (pelo id) e sobrevive ao
+      frame; uma tab que deixe de ser submetida desaparece com ela e a barra escolhe
+      a primeira. A escolha do clique vale já para o realce e para o conteúdo do
+      frame seguinte (é a regra do ImGui: quem abre o conteúdo é quem estava
+      escolhido no início do frame). Com os `TabBarFlags` (`Reorderable` troca a
+      ordem com um arrasto, `AutoSelectNewTabs`, `Fitting` que divide a largura da
+      barra, `NoCloseWithMiddleMouseButton`) e os `TabItemFlags` (`SetSelected`,
+      `UnsavedDocument`), a secção das tabs do demo fica coberta menos a lista de
+      todas as tabs (`TabListPopupButton`) e os botões de tab (`TabItemButton`).
+      *Onde:* `src/Gui.cpp` (`beginTabBar`/`beginTabItem`/`endTabItem`/`endTabBar`,
+      `contentClip`, `availableWidth`), `include/igui/Gui.hpp` (`TabBarFlags`,
+      `TabItemFlags`, `TabBarState`), `tests/test_item_status.cpp`.
+- [x] **O botão da lista de tabs e os botões de tab** (`TabListPopupButton`,
+      `TabItemButton` com `Leading`/`Trailing`): o botão da lista é o combo sem
+      pré-visualização encostado à esquerda da barra, que lista as tabs do frame
+      anterior (como no ImGui) e escolhe por elas; o `tabItemButton` é uma tab que é
+      um botão - não escolhe nem abre conteúdo, devolve o clique, e a banda
+      (Leading/Trailing) diz de que ponta ela é. A faixa da barra passa a ser medida
+      em três bandas (leading, meio, trailing), com as tabs encostadas aos botões da
+      sua ponta, e é o que sobra que o `Fitting` divide.
+      *Onde:* `src/Gui.cpp` (`beginTabBar`, `tabListPopupButton`, `tabItemButton`,
+      `endTabBar`), `include/igui/Gui.hpp` (`TabBarFlags`, `TabItemFlags`,
+      `TabBarState`, `TabBarSubmitState`), `tests/test_item_status.cpp`
+      (`test_tab_item_button_and_bands`, `test_tab_list_popup_button`).
+- [ ] **O `TabListButton`** (a listinha de tabs numa janelinha própria) e as tabs de
+      um dock space (que já tem as dele).
+      *Onde:* `src/Gui.cpp` (`beginTabBar`), o `DockSpaceState` é o precedente.
+- [x] **A rolagem horizontal e as colunas presas** (`TableStyle::scrollX` +
+      `innerWidth` + `freezeCols`): as colunas são a largura pedida (dividida pelos
+      pesos) e o que não couber na tabela rola dentro dela, com a roda horizontal
+      (`wheelX`, o de um trackpad) e uma barra arrastável em baixo (que fica dentro da
+      caixa da tabela); as primeiras `freezeCols` colunas ficam presas à esquerda e é
+      por elas que o que rola é cortado - nas células e no cabeçalho, que seguem a
+      mesma geometria. Sem `innerWidth` (ou com um valor menor do que a tabela) não há
+      rolagem nenhuma e as colunas continuam a dividir a largura dela.
+      *Onde:* `src/Gui.cpp` (`beginTableScroll`, `tableColumnX`,
+      `tableNaturalColumnX`, `tableColumnWidth`, `tableRowClip`, `endTable`),
+      `tests/test_item_status.cpp`.
+- [x] **`sizingFixedFit` (as colunas do tamanho do conteúdo)**: `TableStyle::
+      sizingFixedFit` dá a cada coluna a largura do maior conteúdo dela (cabeçalho
+      incluído) mais a margem da célula, medida no frame anterior - o mesmo contrato
+      do resto, porque o conteúdo de uma célula só se sabe depois de a submeter. A
+      largura fica guardada por tabela (pelo id). *O que falta:* o redimensionamento
+      pelo grip com o FixedFit (o grip mexe nos pesos).
+      *Onde:* `src/Gui.cpp` (`configureTable`, `tableColumnWidth`,
+      `measureTableCellWidth`), `tests/test_item_status.cpp`
+      (`test_table_sizing_fixed_fit`).
+- [ ] **O resto das tabelas**: `NoPad`/`ContextMenuInBody`, os `TableColumnFlags`
+      por coluna e as tabelas aninhadas (uma tabela dentro de uma célula).
+      *Onde:* `src/Gui.cpp` (`tableColumnX`, `tableColumnWidth`, `beginTable`).
+- [x] **Um menu que é contentor de layout**: o corpo de um menu aberto tem o seu
+      `layout_` (cursor, largura e clip do popup), o `currentDrawList` devolve a
+      sobreposição da janela (é onde os itens do menu estão) e o `contentClip` passa
+      a ser o popup. É uma pilha de 4 (um submenu abre um contentor dentro do do pai,
+      e ao fechar os itens do pai continuam com o cursor onde estava). Os itens de
+      menu passam a andar no layout (é o que faz o que vem a seguir a um slider cair
+      por baixo dele) e o popup cresce com o que o chamador submeter. O `beginContextMenu`
+      ainda não entra nesta pilha.
+      *Onde:* `src/Gui.cpp` (`beginMenuContent`/`endMenuContent`/`syncMenuLayoutItem`,
+      `beginMenu`/`endMenu`/`beginSubMenu`/`endSubMenu`), `tests/test_item_status.cpp`.
+- [x] **`beginContextMenu` como contentor de layout**: o mesmo caminho do
+      `beginMenu` (e o `endContextMenu` fecha-o pelo `endMenu`, que é o mesmo).
+      *Onde:* `src/Gui.cpp` (`beginContextMenu`), `tests/test_item_status.cpp`.
+- [x] **Popups com ids**: `openPopup(id)` (no ponteiro), `openPopup(id, pos)`,
+      `openPopup(id, pos, size)`, `beginPopup(id)`/`endPopup()`, `closeCurrentPopup()`
+      e `isPopupOpen(id)`. O id é global, o corpo é o mesmo contentor de layout do
+      menu (um slider ou um child lá dentro ficam no popup), fecha com um clique fora
+      (ou o Escape) e um popup que deixe de ser submetido é largado. A largura da
+      caixa é pedida, nunca medida: os itens de um popup esticam-se à largura que têm
+      e medi-la fazia a caixa crescer a cada frame.
+      *Onde:* `src/Gui.cpp` (`openPopup`/`beginPopup`/`endPopup`/`closeCurrentPopup`/
+      `isPopupOpen`), `tests/test_item_status.cpp`.
+- [x] **O modal com título próprio** (`beginPopupModal`): o chamador abre-o com o
+      `openPopup` do *título* (é a mesma regra do ImGui: o id do popup é o nome com
+      que o `beginPopupModal` o submete) e ele sai centrado no écran, com a barra de
+      título (o título e, quando o chamador dá um `bool *open`, o X que o fecha),
+      medido pelo conteúdo (ao contrário de um popup comum, cuja largura é pedida),
+      e desenhado numa lista própria por cima de todas as janelas - só as message
+      boxes ficam acima. Um clique fora não o fecha (trava a interface atrás de um
+      véu, e os atalhos do `shortcut()` também ficam presos): fecha com o Escape, o
+      X ou o `closeCurrentPopup`. Com ele, os flags do `openPopup` (`AtCursor`,
+      `NoOpenOverExistingPopup`, e o `AnyPopupId` do `isPopupOpen`), a secção dos
+      popups do demo fica coberta: "Select..", "Toggle.." (com o "Stacked Popup"
+      aberto de dentro dele) e "With a menu.." estão na galeria.
+      *Onde:* `src/Gui.cpp` (`beginPopupModal`, `endPopup`, `beginPopupContent`,
+      `openPopup`), `include/igui/Gui.hpp` (`PopupFlags`), `tests/test_item_status.cpp`.
+- [x] **A pilha de popups**: um popup aberto de dentro de outro fica por cima sem
+      fechar o pai (é o "Stacked Popup" do demo, e o `ShowExampleAppDocuments` faz-se
+      com um popup por documento). O estado passou de "um popup" para uma pilha de
+      entradas (id, posição, largura pedida, medida do corpo, caixa do início do
+      frame, modal), e com ela o `pointerBlockedByOpenPopup` passou a olhar para a
+      pilha toda: só o popup de cima (e o corpo que ele está a submeter) recebe o
+      ponteiro, o Escape fecha só o de cima, e um clique dentro do pai mas fora do
+      filho fecha só o filho. Os itens de menu (`menuItem`, `menuCheckbox`,
+      `menuSeparator`, `beginSubMenu`) passaram a valer também dentro de um popup -
+      é o que o "Toggle.." do demo usa - e um popup pode levar uma barra de menus
+      (o "With a menu..").
+      *Onde:* `src/Gui.cpp` (`popups_`, `findPopup`, `closePopupAt`, `openPopupSized`,
+      `beginPopup`, `endPopup`, `beginPopupModal`, `menuItemInternal`, `menuSeparator`,
+      `beginSubMenu`, `pointerBlockedByOpenPopup`), `include/igui/Gui.hpp`
+      (`PopupEntry`), `tests/test_item_status.cpp` (`test_stacked_popups`),
+      `examples/compare_gallery/GalleryIgui.cpp`.
+- [x] **Flags do `openPopup` e a pilha de ids por popup**: `openPopup(id, AtCursor)`
+      abre encostado ao cursor do layout (um menu de contexto), o
+      `NoOpenOverExistingPopup` não abre por cima do que já lá está e o
+      `isPopupOpen(id, AnyPopupId)` diz que há um popup aberto seja ele qual for -
+      que é como uma aplicação sabe que tem um popup pendente. A lista de popups
+      por id faz-se com um `openPopup`/`beginPopup` por id (é o `ShowExampleAppDocuments`),
+      e a pilha ficou no item seguinte.
+      *Onde:* `src/Gui.cpp` (`openPopup`, `isPopupOpen`), `include/igui/Gui.hpp`
+      (`PopupFlags`), `tests/test_item_status.cpp`.
+- [x] **Fontes, vários tamanhos**: com o `pushStyleVar(&Theme::fontSize, x)` o texto
+      de dentro do bloco (widgets incluídos) sai maior ou menor. O `FontAtlas` coze
+      uma face e desenha-a escalada pelo tamanho lógico, por isso não é preciso
+      cozer nada: é o que dá o "Font size" e o "SetWindowFontScale" do demo.
+      *Onde:* `src/FontAtlas.cpp` (`appendText`, o `scale = logicalSize / bakedSize_`),
+      `tests/test_widgets.cpp`.
+- [x] **Fontes, mais de uma face** (`pushFont(FontId)`/font picker): o `FontAtlas`
+      empacota as faces todas no mesmo atlas (`loadFont`, cada uma com os seus
+      ranges, o tamanho de fabrico e as métricas dela) e o `Context` escolhe a face
+      com o `pushFont`/`popFont` - a face leva o tamanho dela, e o tamanho lógico
+      continua a ser do tema. A galeria carrega as mesmas faces que o demo
+      (`misc/fonts`) nos dois lados, e o combo da secção "Fonts" é o
+      `ShowFontSelector` do ImGui, o `io.FontDefault` do painel todo.
+      *Onde:* `src/FontAtlas.cpp` (`loadFont`, `rebuild`, `packFace`),
+      `src/Gui.cpp` (`pushFont`/`popFont`), `tests/test_font.cpp`
+      (`test_multiple_faces`), `tests/test_item_status.cpp` (`test_push_font`),
+      `examples/compare_gallery/GalleryIgui.cpp`.
+- [ ] **Navegação por teclado e foco programático**: expor o `advanceFocus` que
+      já existe (`setKeyboardFocusHere`, `isItemFocused`, `focusNextWindow`,
+      `activateItem`), e uma tab order explícita.
+      *Onde:* `src/Gui.cpp:1255` (`advanceFocus`, `registerFocusable`),
+      `include/igui/Gui.hpp`.
+- [ ] **Flags de drag & drop** (preview próprio, aceitar antes de largar, expirar
+      payload, condição de entrega) e os exemplos de reordenar/copiar.
+      *Onde:* `src/Gui.cpp` (`beginDragSource`, `acceptDragDropTarget`,
+      `drawDragDropPreview`).
+
+## P3 — ferramentas e infraestrutura
+
+- [x] **Painel de métricas** (tempos, itens, vértices, draw calls e as lacunas) —
+      é a janela `metricsWindow` do espelho, no menu Tools do demo. *O que falta:*
+      os contadores por janela (o `Context` conta o frame todo) e as draw lists.
+- [x] **Editor de tema** em runtime (cores, paddings, raio) por cima de
+      `setTheme`, sem recompilar: a janela `styleEditorWindow` edita o `Theme` em
+      vigor pelo novo `Context::theme()` (o `GetStyle()` do ImGui), com um "Revert"
+      para o estado em que o editor o encontrou. *Onde:* `examples/compare_gallery/
+      GalleryIgui.cpp` (`kThemeSizes`/`kThemeColors`), `src/Gui.cpp` (`theme()`).
+- [ ] **Log de debug** das ações do contexto (cliques, ids que reagem) para
+      resolver sobreposições de ids.
+- [x] **Style vars** (`pushStyleColor`/`pushStyleVar`): o campo do tema é um
+      ponteiro para membro (`&Theme::buttonBackground`, `&Theme::widgetHeight`), por
+      isso qualquer campo vale sem uma lista a manter. Pilha de 16 níveis, o pop
+      repõe o valor de antes, um push sem pop vale só para o frame dele e o
+      `setTheme` esvazia a pilha.
+      *Onde:* `src/Gui.cpp` (`pushStyleColor`/`popStyleColor`/`pushStyleVar`/
+      `popStyleVar`/`clearStyleStacks`), `tests/test_widgets.cpp`.
+- [ ] **Protocolo de texturas dinâmicas** no backend (como o
+      `ImGuiBackendFlags_RendererHasTextures` do ImGui 1.92): atualizações
+      incrementais do atlas e texturas de ícones, em vez do upload inteiro.
+- [ ] **`imGuiIO` equivalente**: um objeto de configuração e estado global
+      (escala de fonte, cursor, limites de ini, flags de comportamento) em vez
+      de setters espalhados pelo `Context`.
+
+## Notas
+
+- As lacunas que **não** valem a pena copiar: as APIs obsoletas do ImGui
+  (`Columns`, `BeginChildFrame`, `DragScalar(N)` genérico) e o
+  `PushAllowKeyboardFocus`/`PopAllowKeyboardFocus`, já removidos.
+- O espelho (`GalleryIgui.cpp`) é a checklist viva: cada `reportGap()` que
+  desaparecer passa a ser uma linha a menos no relatório do demo, e o número de
+  lacunas impresso no fim é o progresso.

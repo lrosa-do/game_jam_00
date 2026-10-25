@@ -1,0 +1,77 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "Node3D",
+    "name": "WhiteCloud",
+    "properties": {
+      "script": "Assets/Scripts/fx_life.py",
+      "life": 7.0
+    },
+    "children": [
+      {
+        "class": "ParticleSystem3D",
+        "name": "Cloud",
+        "properties": {
+          "blend_mode": 0,
+          "align": 0,
+          "max_particles": 60,
+          "emission_mode": 0,
+          "emission_rate": 0.0,
+          "emission_direction": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "emission_spread_angle": 180.0,
+          "gravity": [
+            0,
+            0.15,
+            0
+          ],
+          "drag": 1.4,
+          "shape_type": 1,
+          "texture": "Assets/Textures/Fx/smoke.png",
+          "shape_radius": 0.4,
+          "particle_lifetime_min": 3.0,
+          "particle_lifetime_max": 5.5,
+          "particle_speed_min": 0.8,
+          "particle_speed_max": 3.0,
+          "particle_size_start": [
+            0.6,
+            0.6
+          ],
+          "particle_size_end": [
+            3.2,
+            3.2
+          ],
+          "particle_color_start": [
+            0.95,
+            0.95,
+            0.95,
+            0.8
+          ],
+          "particle_color_end": [
+            0.9,
+            0.9,
+            0.9,
+            0.0
+          ],
+          "particle_rotation_speed_min": -0.6,
+          "particle_rotation_speed_max": 0.6
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Sound",
+        "properties": {
+          "stream": "Assets/Sounds/explosion/small.wav",
+          "attenuation_model": 1,
+          "max_distance": 45.0,
+          "unit_size": 5.0,
+          "volume_linear": 1.0
+        }
+      }
+    ]
+  }
+}

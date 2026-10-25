@@ -1,0 +1,185 @@
+#ifndef KINETIX_PHYSICS_CHARACTER_RIGID_BODY_H
+#define KINETIX_PHYSICS_CHARACTER_RIGID_BODY_H
+
+#include <kinetix/core/Math.h>
+#include <kinetix/core/Types.h>
+#include "collision/CollisionShape.h"
+#include "collision/Narrowphase.h"
+#include "dynamics/RigidBody.h"
+
+#include <ct/vector.hpp>
+
+namespace kinetix::Physics
+{
+
+class PhysicsWorld;
+
+class CharacterRigidBody
+{
+public:
+    enum class GroundState : u8
+    {
+        OnGround,
+        OnSteepGround,
+        NotSupported,
+        InAir
+    };
+
+    static constexpr u32 kInvalidBodyId = 0xFFFFFFFFu;
+
+    CharacterRigidBody();
+    // Leaves the world it was added to. The world keeps pointers to the
+    // body and the shape this object holds, so it must not outlive them.
+    ~CharacterRigidBody();
+
+    // Not copyable or movable: the world holds &mBody and &mShape, and a
+    // copy or a move would leave it pointing at the old object.
+    CharacterRigidBody(const CharacterRigidBody&) = delete;
+    CharacterRigidBody& operator=(const CharacterRigidBody&) = delete;
+    CharacterRigidBody(CharacterRigidBody&&) = delete;
+    CharacterRigidBody& operator=(CharacterRigidBody&&) = delete;
+
+    void setShape(f32 radius, f32 height);
+    f32 radius() const
+    {
+        return mRadius;
+    }
+    f32 height() const
+    {
+        return mHeight;
+    }
+
+    void setMass(f32 mass);
+    f32 mass() const
+    {
+        return mMass;
+    }
+    void setFriction(f32 friction);
+    f32 friction() const
+    {
+        return mFriction;
+    }
+    void setMaxSlopeAngle(f32 degrees);
+    f32 maxSlopeAngle() const
+    {
+        return mMaxSlopeAngleDegrees;
+    }
+    void setSupportingVolume(const Plane& plane)
+    {
+        mSupportingVolume = plane;
+    }
+    const Plane& supportingVolume() const
+    {
+        return mSupportingVolume;
+    }
+    void setUp(const Math::vec3& up)
+    {
+        mUp = Math::normalize(up);
+    }
+    const Math::vec3& up() const
+    {
+        return mUp;
+    }
+    void setLayer(u32 layer);
+    u32 layer() const
+    {
+        return mLayer;
+    }
+    void setMask(u32 mask);
+    u32 mask() const
+    {
+        return mMask;
+    }
+
+    // Registers this object's own body. Calling it again, or after
+    // bindToBody(), first leaves whatever it was attached to, so the world
+    // never holds two entries for the one body.
+    void addToWorld(PhysicsWorld& world, const Math::vec3& position);
+    // Drives a body somebody else already put in `world`: the ground probe
+    // runs against that body's own shape and pose, and the velocity and
+    // impulse calls act on it. Nothing is added to or removed from the world.
+    bool bindToBody(PhysicsWorld& world, u32 bodyId);
+    void removeFromWorld();
+    u32 bodyId() const
+    {
+        return mBodyId;
+    }
+
+    void setLinearVelocity(const Math::vec3& velocity);
+    const Math::vec3& linearVelocity() const;
+    void addLinearVelocity(const Math::vec3& velocity);
+    void addImpulse(const Math::vec3& impulse);
+
+    const Math::vec3& position() const;
+    Math::mat4 transform() const;
+
+    void postSimulation(f32 maxSeparationDistance);
+
+    GroundState groundState() const
+    {
+        return mGroundState;
+    }
+    const Math::vec3& groundNormal() const
+    {
+        return mGroundNormal;
+    }
+    const Math::vec3& groundPosition() const
+    {
+        return mGroundPosition;
+    }
+    const Math::vec3& groundVelocity() const
+    {
+        return mGroundVelocity;
+    }
+    u32 groundBodyId() const
+    {
+        return mGroundBodyId;
+    }
+    bool isSupported() const
+    {
+        return mGroundState == GroundState::OnGround || mGroundState == GroundState::OnSteepGround;
+    }
+
+private:
+    RigidBody& body()
+    {
+        return *mBodyRef;
+    }
+    const RigidBody& body() const
+    {
+        return *mBodyRef;
+    }
+
+    RigidBody mBody;
+    CapsuleShape mShape{0.4f, 0.6f};
+    RigidBody* mBodyRef = &mBody;
+    const CollisionShape* mShapeRef = &mShape;
+    bool mBound = false;
+
+    PhysicsWorld* mWorld = nullptr;
+    u32 mBodyId = kInvalidBodyId;
+
+    f32 mRadius = 0.4f;
+    f32 mHeight = 1.2f;
+    f32 mMass = 80.0f;
+    f32 mFriction = 0.2f;
+    u32 mLayer = 1;
+    u32 mMask = 0xFFFFFFFFu;
+
+    Math::vec3 mUp{0.0f, 1.0f, 0.0f};
+    Plane mSupportingVolume{Math::vec3(0.0f, 1.0f, 0.0f), -1.0e10f};
+    f32 mMaxSlopeAngleDegrees = 50.0f;
+    f32 mMaxSlopeAngleCosine = 0.64278759f;
+
+    GroundState mGroundState = GroundState::InAir;
+    u32 mGroundBodyId = kInvalidBodyId;
+    Math::vec3 mGroundNormal{0.0f};
+    Math::vec3 mGroundPosition{0.0f};
+    Math::vec3 mGroundVelocity{0.0f};
+    ct::Vector<u32> mCandidates;
+    ct::Vector<ContactManifold> mManifolds;
+};
+
+} // namespace kinetix::Physics
+
+#endif // KINETIX_PHYSICS_CHARACTER_RIGID_BODY_H

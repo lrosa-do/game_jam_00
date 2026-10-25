@@ -1,0 +1,268 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "CharacterBody3D",
+    "name": "Player",
+    "groups": [
+      "player",
+      "damageable"
+    ],
+    "properties": {
+      "script": "Assets/Scripts/player.py",
+      "radius": 0.3,
+      "height": 1.1,
+      "push_force": 60.0,
+      "collision_mask": 3
+    },
+    "children": [
+      {
+        "class": "CollisionShape3D",
+        "name": "Shape",
+        "properties": {
+          "shape_type": 3,
+          "capsule_radius": 0.3,
+          "capsule_height": 1.7
+        }
+      },
+      {
+        "instance": "Assets/Models/Player/player.glb",
+        "name": "Model",
+        "editable": true,
+        "properties": {
+          "position": [
+            0.0,
+            -0.85,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            3.14159265,
+            0.0
+          ]
+        },
+        "overrides": [
+          {
+            "path": "Armature/Skeleton3D",
+            "children": [
+              {
+                "class": "AnimationPlayer",
+                "name": "AnimationPlayer",
+                "properties": {
+                  "animation_files": "Assets/Animations/mona/Stand.glb;Assets/Animations/mona/Fall.glb;Assets/Animations/mona/Jump_Up.glb;Assets/Animations/mona/Land.glb;Assets/Animations/mona/MeleeHit_Forward.glb;Assets/Animations/mona/GetHit_Small.glb;Assets/Animations/mona/Death_A.glb;Assets/Animations/mona/Mona_Run_Forward.glb;Assets/Animations/mona/Mona_Run_ForwardLeft.glb;Assets/Animations/mona/Mona_Run_ForwardRight.glb;Assets/Animations/mona/Mona_Run_Backward.glb;Assets/Animations/mona/Mona_Run_BackwardLeft.glb;Assets/Animations/mona/Mona_Run_BackwardRight.glb;Assets/Animations/mona/Mona_Run_Left.glb;Assets/Animations/mona/Mona_Run_Right.glb;Assets/Animations/mona/ShootDodge_Forward.glb;Assets/Animations/mona/ShootDodge_ForwardLeft.glb;Assets/Animations/mona/ShootDodge_ForwardRight.glb;Assets/Animations/mona/ShootDodge_Backward.glb;Assets/Animations/mona/ShootDodge_BackwardLeft.glb;Assets/Animations/mona/ShootDodge_BackwardRight.glb;Assets/Animations/mona/ShootDodge_Left.glb;Assets/Animations/mona/ShootDodge_Right.glb;Assets/Animations/mona/ShootDodge_Forward_Getup.glb;Assets/Animations/mona/ShootDodge_Backward_Getup.glb;Assets/Animations/mona/ShootDodge_Left_Getup.glb;Assets/Animations/mona/ShootDodge_Right_Getup.glb;Assets/Animations/flying_kick_inplace.glb;Assets/Animations/pistol_whip.glb",
+                  "autoplay": "Stand"
+                }
+              },
+              {
+                "class": "AnimationPlayer",
+                "name": "Upper",
+                "properties": {
+                  "animation_files": "Assets/Animations/mona/Custom_Aim_Pistol_upper.glb;Assets/Animations/mona/Reload_Beretta_upper.glb;Assets/Animations/mona/BT2_Reload_Handgun_upper.glb",
+                  "autoplay": "Custom_Aim_Pistol_upper"
+                }
+              },
+              {
+                "class": "Node3D",
+                "name": "AimBend",
+                "properties": {
+                  "script": "Assets/Scripts/aim_bend.py"
+                }
+              },
+              {
+                "class": "BoneAttachment3D",
+                "name": "RightHand",
+                "properties": {
+                  "bone_name": "RightHand"
+                },
+                "children": [
+                  {
+                    "class": "Node3D",
+                    "name": "Grip",
+                    "properties": {
+                      "rotation": [
+                        0.0,
+                        0.0,
+                        1.5708
+                      ]
+                    },
+                    "children": [
+                      {
+                        "instance": "Assets/Models/Weapons/pistol.glb",
+                        "name": "Pistol",
+                        "properties": {
+                          "position": [
+                            0.0,
+                            0.0,
+                            0.0
+                          ],
+                          "rotation": [
+                            3.14159,
+                            0.0,
+                            0.0
+                          ]
+                        }
+                      },
+                      {
+                        "instance": "Assets/Prefabs/muzzle_flash.scene.json",
+                        "name": "Muzzle",
+                        "properties": {
+                          "position": [
+                            0.215,
+                            -0.055,
+                            0.0
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "class": "Node3D",
+        "name": "Pivot",
+        "properties": {
+          "position": [
+            0.0,
+            0.55,
+            0.0
+          ]
+        },
+        "children": [
+          {
+            "class": "Camera3D",
+            "name": "Camera",
+            "properties": {
+              "position": [
+                0.55,
+                0.35,
+                2.2
+              ],
+              "fov": 65.0,
+              "current": true
+            },
+            "children": [
+              {
+                "class": "AudioListener3D",
+                "name": "Ears",
+                "properties": {
+                  "current": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Shot",
+        "properties": {
+          "stream": "Assets/Sounds/weapons/shoot_deserteagle.ogg",
+          "attenuation_model": 1,
+          "max_distance": 40.0,
+          "unit_size": 4.0,
+          "volume_linear": 0.9
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Empty",
+        "properties": {
+          "stream": "Assets/Sounds/weapons/shoot_empty.ogg",
+          "attenuation_model": 1,
+          "max_distance": 20.0,
+          "unit_size": 3.0,
+          "volume_linear": 0.8
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Melee",
+        "properties": {
+          "stream": "Assets/Sounds/cop/punch_01.wav",
+          "attenuation_model": 1,
+          "max_distance": 25.0,
+          "unit_size": 3.0,
+          "volume_linear": 1.0
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Whoosh",
+        "properties": {
+          "stream": "Assets/Sounds/cop/whoosh_01.wav",
+          "attenuation_model": 1,
+          "max_distance": 20.0,
+          "unit_size": 3.0,
+          "volume_linear": 0.8
+        }
+      },
+      {
+        "class": "AudioStreamPlayer",
+        "name": "SlowStart",
+        "properties": {
+          "stream": "Assets/Sounds/bt/slow_motion_start.ogg",
+          "bus": 1,
+          "volume_linear": 1.0
+        }
+      },
+      {
+        "class": "AudioStreamPlayer",
+        "name": "SlowEnd",
+        "properties": {
+          "stream": "Assets/Sounds/bt/slow_motion_end.ogg",
+          "bus": 1,
+          "volume_linear": 1.0
+        }
+      },
+      {
+        "class": "AudioStreamPlayer",
+        "name": "Heartbeat",
+        "properties": {
+          "stream": "Assets/Sounds/bt/slow_motion_heartbeat.ogg",
+          "bus": 1,
+          "volume_linear": 0.9
+        }
+      },
+      {
+        "class": "AudioStreamPlayer",
+        "name": "Dive",
+        "properties": {
+          "stream": "Assets/Sounds/bt/shootdodge.ogg",
+          "bus": 1,
+          "volume_linear": 1.0
+        }
+      },
+      {
+        "class": "AudioStreamPlayer",
+        "name": "Reload",
+        "properties": {
+          "stream": "Assets/Sounds/weapons/reload_deserteagle.ogg",
+          "bus": 0,
+          "volume_linear": 1.0
+        }
+      },
+      {
+        "class": "AudioStreamPlayer",
+        "name": "ReloadBt",
+        "properties": {
+          "stream": "Assets/Sounds/bt/bt_reload.ogg",
+          "bus": 1,
+          "volume_linear": 1.0
+        }
+      },
+      {
+        "class": "AudioStreamPlayer",
+        "name": "Pickup",
+        "properties": {
+          "stream": "Assets/Sounds/fx/pickup_ammo.ogg",
+          "bus": 0,
+          "volume_linear": 1.0
+        }
+      }
+    ]
+  }
+}

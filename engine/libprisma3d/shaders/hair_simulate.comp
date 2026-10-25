@@ -1,0 +1,534 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct HairCollider
+{
+	vec4 position_radius;
+	vec4 tip_type;
+	vec4 normal;
+	mat4 projection;
+};
+
+struct HairForce
+{
+	vec4 position_type;
+	vec4 direction_gravity;
+	vec4 range;
+};
+
+layout(set = 0, binding = 0, std140) uniform HairParams
+{
+	mat4 transform;
+	mat4 inverse_transform;
+	vec4 camera_position_dt;
+	vec4 camera_up_time;
+	uvec4 counts;
+	vec4 dynamics;
+	vec4 shape;
+	uvec4 flags_counts;
+	vec4 wind_direction;
+	vec4 atlas_mul_add[64];
+	vec4 atlas_size_aspect[64];
+	HairCollider colliders[16];
+	HairForce forces[8];
+}
+params;
+
+struct ScalpVertex
+{
+	vec4 position_length;
+	vec4 normal;
+};
+
+layout(set = 2, binding = 0, std430) buffer restrict readonly Scalp
+{
+	ScalpVertex vertices[];
+}
+scalp;
+
+layout(set = 2, binding = 1, std430) buffer restrict readonly ScalpIndices
+{
+	uint indices[];
+}
+scalp_indices;
+
+layout(set = 2, binding = 2, std430) buffer Tails
+{
+	vec4 data[];
+}
+tails;
+
+layout(set = 2, binding = 3, std430) buffer restrict writeonly Vertices
+{
+	float data[];
+}
+vertices;
+
+layout(set = 1, binding = 0) uniform sampler3D wind_texture;
+
+const uint kFlagRegenerate = 1u;
+const uint kFlagCameraBend = 2u;
+const uint kFlagWind = 4u;
+const uint kVertexFloats = 12u;
+const float kPi = 3.14159265358979;
+
+#define strand_count params.counts.x
+#define segment_count params.counts.y
+#define billboard_count params.counts.z
+#define random_seed params.counts.w
+#define hair_length params.dynamics.x
+#define hair_stiffness params.dynamics.y
+#define hair_drag params.dynamics.z
+#define hair_gravity params.dynamics.w
+#define hair_randomness params.shape.x
+#define hair_view_distance params.shape.y
+#define hair_aspect params.shape.z
+#define hair_uniformity params.shape.w
+#define hair_flags params.flags_counts.x
+#define atlas_count params.flags_counts.y
+#define collider_count params.flags_counts.z
+#define force_count params.flags_counts.w
+
+uint rotl(uint x, uint k)
+{
+	return (x << k) | (x >> (32u - k));
+}
+
+uint rng_next(inout uvec2 s)
+{
+	uint result = s.x * 0x9e3779bbu;
+	s.y ^= s.x;
+	s.x = rotl(s.x, 26u) ^ s.y ^ (s.y << 9u);
+	s.y = rotl(s.y, 13u);
+	return result;
+}
+
+uint wang_hash(uint seed)
+{
+	seed = (seed ^ 61u) ^ (seed >> 16u);
+	seed *= 9u;
+	seed = seed ^ (seed >> 4u);
+	seed *= 0x27d4eb2du;
+	seed = seed ^ (seed >> 15u);
+	return seed;
+}
+
+void rng_init(inout uvec2 s, uvec2 id, uint frame_index)
+{
+	uint s0 = (id.x << 16u) | id.y;
+	s.x = wang_hash(s0);
+	s.y = wang_hash(frame_index);
+	rng_next(s);
+}
+
+float rng_float(inout uvec2 s)
+{
+	uint u = 0x3f800000u | (rng_next(s) >> 9u);
+	return uintBitsToFloat(u) - 1.0;
+}
+
+uint rng_uint(inout uvec2 s, uint nmax)
+{
+	float f = rng_float(s);
+	return uint(floor(f * float(nmax)));
+}
+
+float hash_unit(uint h)
+{
+	return float(h >> 8u) * (1.0 / 16777216.0) * 2.0 - 1.0;
+}
+
+vec3 hash_gradient_3d(vec3 p)
+{
+	uint x = uint(int(p.x));
+	uint y = uint(int(p.y));
+	uint z = uint(int(p.z));
+	uint seed = wang_hash(x * 73856093u ^ y * 19349663u ^ z * 83492791u);
+	uint h0 = wang_hash(seed);
+	uint h1 = wang_hash(h0);
+	uint h2 = wang_hash(h1);
+	return vec3(hash_unit(h0), hash_unit(h1), hash_unit(h2));
+}
+
+float noise_gradient_3d(vec3 p)
+{
+	vec3 i = floor(p);
+	vec3 f = fract(p);
+	vec3 u = f * f * (3.0 - 2.0 * f);
+	return mix(mix(mix(dot(hash_gradient_3d(i + vec3(0.0, 0.0, 0.0)), f - vec3(0.0, 0.0, 0.0)),
+						   dot(hash_gradient_3d(i + vec3(1.0, 0.0, 0.0)), f - vec3(1.0, 0.0, 0.0)), u.x),
+					   mix(dot(hash_gradient_3d(i + vec3(0.0, 1.0, 0.0)), f - vec3(0.0, 1.0, 0.0)),
+						   dot(hash_gradient_3d(i + vec3(1.0, 1.0, 0.0)), f - vec3(1.0, 1.0, 0.0)), u.x),
+					   u.y),
+			mix(mix(dot(hash_gradient_3d(i + vec3(0.0, 0.0, 1.0)), f - vec3(0.0, 0.0, 1.0)),
+						dot(hash_gradient_3d(i + vec3(1.0, 0.0, 1.0)), f - vec3(1.0, 0.0, 1.0)), u.x),
+					mix(dot(hash_gradient_3d(i + vec3(0.0, 1.0, 1.0)), f - vec3(0.0, 1.0, 1.0)),
+						dot(hash_gradient_3d(i + vec3(1.0, 1.0, 1.0)), f - vec3(1.0, 1.0, 1.0)), u.x),
+					u.y),
+			u.z);
+}
+
+vec3 mul_row(vec3 v, vec3 r0, vec3 r1, vec3 r2)
+{
+	return r0 * v.x + r1 * v.y + r2 * v.z;
+}
+
+void tangent_space(vec3 normal, out vec3 tangent, out vec3 binormal)
+{
+	vec3 helper = abs(normal.x) > 0.99 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+	tangent = normalize(cross(normal, helper));
+	binormal = normalize(cross(normal, tangent));
+}
+
+vec3 hemispherepoint_cos(float u, float v)
+{
+	float phi = v * 2.0 * kPi;
+	float cos_theta = sqrt(1.0 - u);
+	float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+	return vec3(cos(phi) * sin_theta, sin(phi) * sin_theta, cos_theta);
+}
+
+vec3 closest_point_on_segment(vec3 a, vec3 b, vec3 c)
+{
+	vec3 ab = b - a;
+	float t = dot(c - a, ab) / dot(ab, ab);
+	return a + clamp(t, 0.0, 1.0) * ab;
+}
+
+float plane_point_distance(vec3 origin, vec3 normal, vec3 p)
+{
+	return dot(normal, p - origin);
+}
+
+vec3 sample_wind(vec3 position, float weight)
+{
+	if (weight > 0.0 && (hair_flags & kFlagWind) != 0u)
+		return textureLod(wind_texture, position, 0.0).r * params.wind_direction.xyz * weight;
+	return vec3(0.0);
+}
+
+void write_vertex(uint v, vec3 position, vec3 normal, vec2 uv)
+{
+	uint o = v * kVertexFloats;
+	vertices.data[o + 0u] = position.x;
+	vertices.data[o + 1u] = position.y;
+	vertices.data[o + 2u] = position.z;
+	vertices.data[o + 3u] = normal.x;
+	vertices.data[o + 4u] = normal.y;
+	vertices.data[o + 5u] = normal.z;
+	vertices.data[o + 6u] = 1.0;
+	vertices.data[o + 7u] = 1.0;
+	vertices.data[o + 8u] = 1.0;
+	vertices.data[o + 9u] = 1.0;
+	vertices.data[o + 10u] = uv.x;
+	vertices.data[o + 11u] = uv.y;
+}
+
+void main()
+{
+	uint strand = gl_GlobalInvocationID.x;
+	if (strand >= strand_count) return;
+
+	uint segments = segment_count;
+	uint billboards = billboard_count;
+	uint vertices_per_strand = (segments * 2u + 2u) * billboards;
+	uint v0 = strand * vertices_per_strand;
+
+	uvec2 rng;
+	rng_init(rng, uvec2(random_seed, strand), 0u);
+
+	uint triangle_count = uint(scalp_indices.indices.length()) / 3u;
+	uint tri = rng_uint(rng, triangle_count);
+	uint i0 = scalp_indices.indices[tri * 3u + 0u];
+	uint i1 = scalp_indices.indices[tri * 3u + 1u];
+	uint i2 = scalp_indices.indices[tri * 3u + 2u];
+
+	float f = rng_float(rng);
+	float g = rng_float(rng);
+	if (f + g > 1.0)
+	{
+		f = 1.0 - f;
+		g = 1.0 - g;
+	}
+	float w0 = 1.0 - f - g;
+
+	vec3 base = scalp.vertices[i0].position_length.xyz * w0 + scalp.vertices[i1].position_length.xyz * f +
+				scalp.vertices[i2].position_length.xyz * g;
+	vec3 target = normalize(scalp.vertices[i0].normal.xyz * w0 + scalp.vertices[i1].normal.xyz * f +
+							scalp.vertices[i2].normal.xyz * g);
+	target = normalize(vec3(dot(params.inverse_transform[0].xyz, target),
+			dot(params.inverse_transform[1].xyz, target), dot(params.inverse_transform[2].xyz, target)));
+	vec3 hemisphere = hemispherepoint_cos(rng_float(rng), rng_float(rng));
+	vec3 ts_tangent;
+	vec3 ts_binormal;
+	tangent_space(target, ts_tangent, ts_binormal);
+	vec3 tangent = normalize(mul_row(vec3(hemisphere.xy, 0.0), ts_tangent, ts_binormal, target));
+	vec3 binormal = cross(target, tangent);
+	float strand_length = scalp.vertices[i0].position_length.w * w0 + scalp.vertices[i1].position_length.w * f +
+						  scalp.vertices[i2].position_length.w * g;
+
+	vec4 atlas_mul_add = vec4(1.0, 1.0, 0.0, 0.0);
+	float atlas_size = 1.0;
+	float atlas_aspect = 1.0;
+	if (atlas_count > 1u)
+	{
+		float noise = noise_gradient_3d(base * hair_uniformity) * 1000.0;
+		uint frame = noise > 0.0 ? uint(noise) : 0u;
+		frame = frame % atlas_count;
+		atlas_mul_add = params.atlas_mul_add[frame];
+		atlas_size = params.atlas_size_aspect[frame].x;
+		atlas_aspect = params.atlas_size_aspect[frame].y;
+	}
+	else if (atlas_count == 1u)
+	{
+		atlas_mul_add = params.atlas_mul_add[0];
+		atlas_size = params.atlas_size_aspect[0].x;
+		atlas_aspect = params.atlas_size_aspect[0].y;
+	}
+
+	base = (params.transform * vec4(base, 1.0)).xyz;
+	vec3 collapsed_base = base;
+
+	vec3 camera_position = params.camera_position_dt.xyz;
+	vec3 diff = camera_position - base;
+	float distance_squared = dot(diff, diff);
+	bool distance_culled = distance_squared > hair_view_distance * hair_view_distance;
+
+	float len = mix(1.0, rng_float(rng), clamp(hair_randomness, 0.0, 1.0)) * strand_length;
+	len *= hair_length;
+	len *= atlas_size;
+	len /= float(segments);
+	float frame_x = atlas_aspect * hair_aspect * float(segments) * len * 0.5;
+	float frame_y = len * 0.5;
+	float segment_radius = max(frame_x, frame_y);
+
+	vec3 camera_up = params.camera_up_time.xyz;
+	vec3 bend = vec3(0.0);
+	if ((hair_flags & kFlagCameraBend) != 0u)
+		bend = camera_up * ((1.0 - clamp(dot(target, camera_up), 0.0, 1.0)) * 0.8);
+
+	vec3 billboard_normal = normalize(target + bend);
+
+	vec3 tbn0 = tangent;
+	vec3 tbn1 = billboard_normal;
+	vec3 tbn2 = binormal;
+
+	const vec3 patch_root[2] = vec3[2](vec3(-1.0, -1.0, 0.0), vec3(1.0, -1.0, 0.0));
+	const vec3 patch_cap[2] = vec3[2](vec3(-1.0, 1.0, 0.0), vec3(1.0, 1.0, 0.0));
+
+	if (distance_culled)
+	{
+		for (uint i = 0u; i < 2u * billboards; ++i)
+		{
+			write_vertex(v0, collapsed_base, billboard_normal, vec2(0.0));
+			++v0;
+		}
+	}
+	else
+	{
+		rng_init(rng, uvec2(random_seed, strand), 1u);
+		for (uint billboard = 0u; billboard < billboards; ++billboard)
+		{
+			float siz = billboard == 0u ? 1.0 : mix(0.2, 1.0, rng_float(rng));
+			float rot = billboard == 0u ? 0.0 : rng_float(rng) * kPi;
+			vec3 var0 = tbn0;
+			vec3 var1 = tbn1;
+			vec3 var2 = tbn2;
+			if (billboard != 0u)
+			{
+				float s = sin(rot);
+				float c = cos(rot);
+				var0 = mul_row(vec3(c * siz, 0.0, -s), tbn0, tbn1, tbn2);
+				var1 = mul_row(vec3(0.0, siz, 0.0), tbn0, tbn1, tbn2);
+				var2 = mul_row(vec3(s, 0.0, c * siz), tbn0, tbn1, tbn2);
+			}
+			for (int vertex = 0; vertex < 2; ++vertex)
+			{
+				vec3 patch_pos = patch_root[vertex];
+				vec2 uv = patch_pos.xy * 0.5 + 0.5;
+				uv.y = 1.0 - uv.y;
+				patch_pos.y += 1.0;
+				uv = uv * atlas_mul_add.xy + atlas_mul_add.zw;
+				patch_pos *= vec3(frame_x, frame_y, frame_x);
+				patch_pos = mul_row(patch_pos, var0, var1, var2);
+				write_vertex(v0, base + patch_pos, billboard_normal, uv);
+				++v0;
+			}
+		}
+	}
+
+	float dt = clamp(params.camera_position_dt.w, 0.0, 1.0 / 30.0);
+	vec3 bone_axis = target;
+	float bone_length = len;
+
+	for (uint segment = 0u; segment < segments; ++segment)
+	{
+		uint particle = strand * segments + segment;
+		vec3 tail_current;
+		vec3 tail_next;
+		vec3 to_tail;
+		if (distance_culled)
+		{
+			tail_current = base + bone_axis * bone_length;
+			tail_next = tail_current;
+			to_tail = bone_axis;
+		}
+		else
+		{
+			if ((hair_flags & kFlagRegenerate) != 0u)
+			{
+				vec3 rest = base + bone_axis * bone_length;
+				tails.data[particle * 2u + 0u] = vec4(rest, 0.0);
+				tails.data[particle * 2u + 1u] = vec4(rest, 0.0);
+			}
+			tail_current = tails.data[particle * 2u + 1u].xyz;
+			vec3 tail_prev = tails.data[particle * 2u + 0u].xyz;
+			vec3 inertia = (tail_current - tail_prev) * (1.0 - hair_drag);
+			vec3 stiffness = bone_axis * hair_stiffness;
+			vec3 external_force = vec3(0.0, -1.0, 0.0) * hair_gravity;
+			external_force += sample_wind(tail_current, float(segment + 1u) / float(segments));
+			tail_next = tail_current + inertia + (stiffness + external_force) * dt;
+			to_tail = normalize(tail_next - base);
+			tail_next = base + to_tail * bone_length;
+		}
+
+		if (!distance_culled)
+		{
+			for (uint c = 0u; c < collider_count; ++c)
+			{
+				uint type = uint(params.colliders[c].tip_type.w);
+				vec3 position = params.colliders[c].position_radius.xyz;
+				float radius = params.colliders[c].position_radius.w;
+				if (type == 1u)
+				{
+					vec3 closest = closest_point_on_segment(position, params.colliders[c].tip_type.xyz, tail_next);
+					vec3 dir = closest - tail_next;
+					float dist = length(dir);
+					dir /= dist;
+					dist = dist - radius - segment_radius;
+					if (dist < 0.0)
+					{
+						tail_next += dir * dist;
+						to_tail = normalize(tail_next - base);
+						tail_next = base + to_tail * bone_length;
+					}
+				}
+				else
+				{
+					vec3 closest = closest_point_on_segment(base, tail_next, position);
+					vec3 dir = position - closest;
+					float dist = length(dir);
+					dir /= dist;
+					if (type == 0u)
+					{
+						dist = dist - radius - segment_radius;
+						if (dist < 0.0)
+						{
+							tail_next += dir * dist;
+							to_tail = normalize(tail_next - base);
+							tail_next = base + to_tail * bone_length;
+						}
+					}
+					else
+					{
+						dir = normalize(params.colliders[c].normal.xyz);
+						dist = plane_point_distance(position, dir, closest);
+						if (dist < 0.0)
+						{
+							dir = -dir;
+							dist = abs(dist);
+						}
+						dist = dist - segment_radius;
+						if (dist < 0.0)
+						{
+							vec4 clip = params.colliders[c].projection * vec4(closest, 1.0);
+							vec3 uvw = clip.xyz * vec3(0.5, -0.5, 0.5) + 0.5;
+							if (all(greaterThanEqual(uvw, vec3(0.0))) && all(lessThanEqual(uvw, vec3(1.0))))
+							{
+								tail_next -= dir * dist;
+								to_tail = normalize(tail_next - base);
+								tail_next = base + to_tail * bone_length;
+							}
+						}
+					}
+				}
+			}
+			for (uint fi = 0u; fi < force_count; ++fi)
+			{
+				vec3 position = params.forces[fi].position_type.xyz;
+				uint type = uint(params.forces[fi].position_type.w);
+				vec3 closest = closest_point_on_segment(base, tail_next, position);
+				vec3 dir = position - closest;
+				float dist = length(dir);
+				dir /= dist;
+				float falloff = 1.0 - clamp(dist / params.forces[fi].range.x, 0.0, 1.0);
+				float gravity = params.forces[fi].direction_gravity.w;
+				if (type == 0u)
+					tail_next += dir * (dt * gravity * falloff);
+				else
+					tail_next += params.forces[fi].direction_gravity.xyz * (dt * gravity * falloff);
+				to_tail = normalize(tail_next - base);
+				tail_next = base + to_tail * bone_length;
+			}
+		}
+
+		float below_plane = plane_point_distance(base, bone_axis, tail_next);
+		if (below_plane < 0.0) tail_next -= bone_axis * below_plane;
+
+		tails.data[particle * 2u + 0u] = vec4(tail_current, 0.0);
+		tails.data[particle * 2u + 1u] = vec4(tail_next, 0.0);
+
+		vec3 normal = to_tail;
+		vec3 normal_bend = normalize(normal + bend);
+		binormal = cross(normal_bend, tangent);
+		tangent = cross(binormal, normal_bend);
+		tbn0 = tangent;
+		tbn1 = normal_bend;
+		tbn2 = binormal;
+
+		if (distance_culled)
+		{
+			for (uint i = 0u; i < 2u * billboards; ++i)
+			{
+				write_vertex(v0, collapsed_base, normal, vec2(0.0));
+				++v0;
+			}
+		}
+		else
+		{
+			rng_init(rng, uvec2(random_seed, strand), 1u);
+			for (uint billboard = 0u; billboard < billboards; ++billboard)
+			{
+				float siz = billboard == 0u ? 1.0 : mix(0.2, 1.0, rng_float(rng));
+				float rot = billboard == 0u ? 0.0 : rng_float(rng) * kPi;
+				vec3 var0 = tbn0;
+				vec3 var1 = tbn1;
+				vec3 var2 = tbn2;
+				if (billboard != 0u)
+				{
+					float s = sin(rot);
+					float c = cos(rot);
+					var0 = mul_row(vec3(c * siz, 0.0, -s), tbn0, tbn1, tbn2);
+					var1 = mul_row(vec3(0.0, siz, 0.0), tbn0, tbn1, tbn2);
+					var2 = mul_row(vec3(s, 0.0, c * siz), tbn0, tbn1, tbn2);
+				}
+				for (int vertex = 0; vertex < 2; ++vertex)
+				{
+					vec3 patch_pos = patch_cap[vertex];
+					vec2 uv = patch_pos.xy * 0.5 + 0.5;
+					uv.y = mix(float(segment) / float(segments), float(segment + 1u) / float(segments), uv.y);
+					uv.y = 1.0 - uv.y;
+					patch_pos.y += 1.0;
+					uv = uv * atlas_mul_add.xy + atlas_mul_add.zw;
+					patch_pos *= vec3(frame_x, frame_y, frame_x);
+					patch_pos = mul_row(patch_pos, var0, var1, var2);
+					write_vertex(v0, base + patch_pos, normal_bend, uv);
+					++v0;
+				}
+			}
+		}
+
+		base = tail_next;
+	}
+}

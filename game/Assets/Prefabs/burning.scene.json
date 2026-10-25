@@ -1,0 +1,148 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "Node3D",
+    "name": "Burning",
+    "properties": {
+      "script": "Assets/Scripts/fx_life.py",
+      "life": 14.0,
+      "stop_at": 11.0
+    },
+    "children": [
+      {
+        "class": "ParticleSystem3D",
+        "name": "Flames",
+        "properties": {
+          "blend_mode": 1,
+          "align": 0,
+          "max_particles": 90,
+          "emission_mode": 0,
+          "emission_rate": 40.0,
+          "emission_direction": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "emission_spread_angle": 20.0,
+          "gravity": [
+            0,
+            1.5,
+            0
+          ],
+          "drag": 0.0,
+          "shape_type": 1,
+          "texture": "Assets/Textures/Fx/soft.png",
+          "shape_radius": 0.7,
+          "particle_lifetime_min": 0.4,
+          "particle_lifetime_max": 0.9,
+          "particle_speed_min": 1.0,
+          "particle_speed_max": 2.6,
+          "particle_size_start": [
+            0.6,
+            0.6
+          ],
+          "particle_size_end": [
+            0.15,
+            0.15
+          ],
+          "particle_color_start": [
+            1.0,
+            0.6,
+            0.15,
+            0.9
+          ],
+          "particle_color_end": [
+            0.9,
+            0.15,
+            0.02,
+            0.0
+          ]
+        }
+      },
+      {
+        "class": "ParticleSystem3D",
+        "name": "Smoke",
+        "properties": {
+          "blend_mode": 0,
+          "align": 0,
+          "max_particles": 50,
+          "emission_mode": 0,
+          "emission_rate": 10.0,
+          "emission_direction": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "emission_spread_angle": 15.0,
+          "gravity": [
+            0,
+            0.6,
+            0
+          ],
+          "drag": 0.0,
+          "shape_type": 1,
+          "texture": "Assets/Textures/Fx/smoke.png",
+          "shape_radius": 0.6,
+          "particle_lifetime_min": 2.0,
+          "particle_lifetime_max": 3.5,
+          "particle_speed_min": 1.0,
+          "particle_speed_max": 2.0,
+          "particle_size_start": [
+            0.6,
+            0.6
+          ],
+          "particle_size_end": [
+            2.4,
+            2.4
+          ],
+          "particle_color_start": [
+            0.08,
+            0.08,
+            0.08,
+            0.7
+          ],
+          "particle_color_end": [
+            0.1,
+            0.1,
+            0.1,
+            0.0
+          ],
+          "particle_rotation_speed_min": -0.5,
+          "particle_rotation_speed_max": 0.5
+        }
+      },
+      {
+        "class": "OmniLight3D",
+        "name": "Glow",
+        "properties": {
+          "position": [
+            0.0,
+            0.8,
+            0.0
+          ],
+          "light_color": [
+            1.0,
+            0.55,
+            0.2,
+            1.0
+          ],
+          "light_energy": 2.5,
+          "omni_range": 6.0,
+          "shadow_enabled": false
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Sound",
+        "properties": {
+          "stream": "Assets/Sounds/explosion/fire_loop.wav",
+          "attenuation_model": 1,
+          "max_distance": 30.0,
+          "unit_size": 4.0,
+          "volume_linear": 0.9
+        }
+      }
+    ]
+  }
+}

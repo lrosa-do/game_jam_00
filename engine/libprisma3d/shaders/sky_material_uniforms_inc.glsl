@@ -1,0 +1,9 @@
+	vec4 sky_top_color;
+	vec4 sky_horizon_color;
+	vec4 ground_bottom_color;
+	vec4 ground_horizon_color;
+	float inv_sky_curve;
+	float inv_ground_curve;
+	float sun_angle_max;
+	float inv_sun_curve;
+	float exposure;

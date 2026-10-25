@@ -1,0 +1,82 @@
+add_library(kinetix-3d
+    src/geometry/ConvexHullComputer.cpp
+    src/geometry/VoronoiShatter.cpp
+    src/dynamics/Joint.cpp
+    src/dynamics/SoftSpring.cpp
+    src/dynamics/JointDrive.cpp
+    src/dynamics/WheelJoint.cpp
+    src/effects/ParticleSystem.cpp
+    src/dynamics/RigidBody.cpp
+    src/dynamics/Atmosphere.cpp
+    src/dynamics/Airfoil.cpp
+    src/dynamics/Wing.cpp
+    src/dynamics/Propeller.cpp
+    src/dynamics/PistonEngine.cpp
+    src/dynamics/Aircraft.cpp
+    src/dynamics/LightAircraft.cpp
+    src/rotorcraft/Rotor.cpp
+    src/rotorcraft/TurboshaftEngine.cpp
+    src/rotorcraft/RotorTransmission.cpp
+    src/rotorcraft/Helicopter.cpp
+    src/rotorcraft/LightHelicopter.cpp
+    src/rotorcraft/HelicopterAutopilot.cpp
+    src/marine/WaterSurface.cpp
+    src/marine/HullMesh.cpp
+    src/marine/BuoyancyBody.cpp
+    src/marine/Hydrofoil.cpp
+    src/marine/MarinePropeller.cpp
+    src/marine/Boat.cpp
+    src/marine/SmallMotorboat.cpp
+    src/marine/PrismBuoyancy.cpp
+    src/marine/ScrewPropeller.cpp
+    src/ground/Tyre.cpp
+    src/ground/Engine.cpp
+    src/ground/Transmission.cpp
+    src/ground/VehicleSolver.cpp
+    src/ground/GroundVehicle.cpp
+    src/ground/TrailerCoupling.cpp
+    src/ground/PassengerCar.cpp
+    src/ground/Truck.cpp
+    src/ground/FarmTractor.cpp
+    src/actuators/HydraulicCylinder.cpp
+    src/actuators/Rope.cpp
+    src/actuators/Hook.cpp
+    src/actuators/ElectricMotor.cpp
+    src/actuators/HydraulicMotor.cpp
+    src/machinery/HydraulicSystem.cpp
+    src/machinery/Terramechanics.cpp
+    src/machinery/TrackedUndercarriage.cpp
+    src/machinery/SoilCutting.cpp
+    src/machinery/Excavator.cpp
+    src/machinery/LoadMomentIndicator.cpp
+    src/machinery/AntiSway.cpp
+    src/machinery/Bulldozer.cpp
+    src/machinery/MobileCrane.cpp
+    src/dynamics/ArticulationSolver.cpp
+    src/dynamics/ContactSolver.cpp
+    src/dynamics/PhysicsWorld.cpp
+    src/dynamics/RaycastVehicle.cpp
+    src/dynamics/MotorcycleController.cpp
+    src/dynamics/PointJoint.cpp
+    src/dynamics/DistanceJoint.cpp
+    src/dynamics/FixedJoint.cpp
+    src/dynamics/ConeTwistJoint.cpp
+    src/dynamics/HingeJoint.cpp
+    src/dynamics/SliderJoint.cpp
+    src/dynamics/PistonJoint.cpp
+    src/dynamics/MouseJoint.cpp
+    src/dynamics/UniversalJoint.cpp
+    src/softbody/SoftBody.cpp
+    src/beamstructure/BeamStructure.cpp
+    src/character/CharacterBody.cpp
+    src/character/CharacterRigidBody.cpp
+    src/character/Ragdoll.cpp
+    src/collision/CollisionShape.cpp
+    src/collision/Narrowphase.cpp
+    src/collision/Broadphase.cpp
+)
+
+target_include_directories(kinetix-3d PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(kinetix-3d PUBLIC kinetix-core)
+
+add_library(kinetix::physics3d ALIAS kinetix-3d)

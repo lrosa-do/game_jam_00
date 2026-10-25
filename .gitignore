@@ -1,0 +1,6 @@
+build/
+build-*/
+engine/bin/
+*.rpak
+out/
+.cache/

@@ -1,0 +1,14 @@
+
+material Scene/Stone
+{
+    technique
+    {
+        pass
+        {
+            texture_unit
+            {
+                texture stone.jpg
+            }
+        }
+    }
+}

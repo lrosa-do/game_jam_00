@@ -1,0 +1,74 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0, std140) uniform OceanParams
+{
+	uvec4 dims;
+	uvec4 offsets;
+	vec4 values;
+}
+ocean;
+
+#define xOceanActualDim ocean.dims.x
+#define xOceanInWidth ocean.dims.y
+#define xOceanOutWidth ocean.dims.z
+#define xOceanOutHeight ocean.dims.w
+#define xOceanSecondFieldOffset ocean.offsets.x
+#define xOceanTime ocean.values.x
+#define xOceanTimeScale ocean.values.y
+
+layout(set = 2, binding = 0, std430) buffer restrict readonly InputH0
+{
+	vec2 data[];
+}
+g_InputH0;
+
+layout(set = 2, binding = 1, std430) buffer restrict readonly InputOmega
+{
+	float data[];
+}
+g_InputOmega;
+
+layout(set = 2, binding = 2, std430) buffer restrict writeonly OutputHt
+{
+	vec2 data[];
+}
+g_OutputHt;
+
+void main()
+{
+	uvec3 DTid = gl_GlobalInvocationID;
+	if (DTid.x > xOceanActualDim || DTid.y > xOceanActualDim) return;
+
+	int in_index = int(DTid.y * xOceanInWidth + DTid.x);
+	int in_mindex = int((xOceanActualDim - DTid.y) * xOceanInWidth + (xOceanActualDim - DTid.x));
+	int out_index = int(DTid.y * xOceanOutWidth + DTid.x);
+
+	vec2 h0_k = g_InputH0.data[in_index];
+	vec2 h0_mk = g_InputH0.data[in_mindex];
+	float phase = g_InputOmega.data[in_index] * xOceanTime * xOceanTimeScale;
+	float sin_v = sin(phase);
+	float cos_v = cos(phase);
+
+	vec2 ht;
+	ht.x = (h0_k.x + h0_mk.x) * cos_v - (h0_k.y + h0_mk.y) * sin_v;
+	ht.y = (h0_k.x - h0_mk.x) * sin_v + (h0_k.y - h0_mk.y) * cos_v;
+
+	float kx = float(DTid.x) - float(xOceanActualDim) * 0.5;
+	float ky = float(DTid.y) - float(xOceanActualDim) * 0.5;
+	float sqr_k = kx * kx + ky * ky;
+	float rsqr_k = 0.0;
+	if (sqr_k > 1e-12)
+		rsqr_k = 1.0 / sqrt(sqr_k);
+	kx *= rsqr_k;
+	ky *= rsqr_k;
+	vec2 dt_x = vec2(ht.y * kx, -ht.x * kx);
+	vec2 dt_y = vec2(ht.y * ky, -ht.x * ky);
+
+	if ((DTid.x < xOceanOutWidth) && (DTid.y < xOceanOutHeight))
+	{
+		g_OutputHt.data[out_index] = vec2(ht.x - dt_x.y, ht.y + dt_x.x);
+		g_OutputHt.data[out_index + int(xOceanSecondFieldOffset)] = dt_y;
+	}
+}

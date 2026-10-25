@@ -1,0 +1,77 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "CharacterBody3D",
+    "name": "Spider",
+    "properties": {
+      "script": "Assets/Scripts/spider.py",
+      "radius": 0.2,
+      "height": 0.0,
+      "push_force": 40.0,
+      "collision_mask": 3
+    },
+    "groups": [
+      "spider"
+    ],
+    "children": [
+      {
+        "class": "CollisionShape3D",
+        "name": "Shape",
+        "properties": {
+          "shape_type": 2,
+          "sphere_radius": 0.2
+        }
+      },
+      {
+        "instance": "Assets/Models/Spider/spider.glb",
+        "name": "Model",
+        "properties": {
+          "position": [
+            0.0,
+            -0.07,
+            0.0
+          ],
+          "scale": [
+            0.3,
+            0.3,
+            0.3
+          ]
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Buzz",
+        "properties": {
+          "stream": "Assets/Sounds/spider/buzz02.ogg",
+          "loop": true,
+          "attenuation_model": 1,
+          "max_distance": 18.0,
+          "unit_size": 2.0,
+          "volume_linear": 0.12
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Voice",
+        "properties": {
+          "attenuation_model": 1,
+          "max_distance": 30.0,
+          "unit_size": 3.0,
+          "volume_linear": 1.0
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Steps",
+        "properties": {
+          "stream": "Assets/Sounds/spider/walk03.ogg",
+          "attenuation_model": 1,
+          "max_distance": 15.0,
+          "unit_size": 2.0,
+          "volume_linear": 0.2
+        }
+      }
+    ]
+  }
+}
