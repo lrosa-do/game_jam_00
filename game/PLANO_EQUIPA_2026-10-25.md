@@ -39,7 +39,7 @@ Regressão da história (headless, 4 minutos): copiar `tools/playthrough_test.py
 `Scenes/game.scene.json`, correr `--headless --fps 60 --frames 14000` e procurar `MARK FINISHED`
 sem linhas `[ERROR]`. Correr antes de cada commit que toque em scripts.
 
-## O que está feito (hoje de manhã)
+## O que está feito
 
 - Música (Max Payne 2): `corruption` nas ordens, `nightmare` depois da verdade, `theme` no fim; baixa
   debaixo das vozes. M ou o ícone do altifalante em baixo à direita liga e desliga.
@@ -63,21 +63,19 @@ sem linhas `[ERROR]`. Correr antes de cada commit que toque em scripts.
 3. **Ecrã de morte e ecrã final** — `game.py` `player_died`, `story.py` `finish`: na morte, flash
    vermelho, câmara lenta 1 s e o texto; no fim, ecrã de resultados (KILLS, TEMPO, HUMANS
    TERMINATED / SPARED, TRUST, veredito "gone right" só se poupou civis), ENTER volta ao menu.
-4. **Intro mais curta** — `game.py` `INTRO` e `draw_intro`: ENTER já salta; cortar as falas para
-   metade do tempo (as linhas 4 a 8) ou deixar andar com a voz como rádio.
-5. **Menu inicial** — `Scenes/boot.scene.json`, `boot.py`: título, START, QUIT, logo CTW; antes de
+
+4. **Menu inicial** — `Scenes/boot.scene.json`, `boot.py`: título, START, QUIT, logo CTW; antes de
    exportar `activeScene` passa a `Scenes/boot.scene.json`.
-6. **Teste no PC com NVIDIA** — correr com `quality` = 2 e 3, anotar fps com Shift+F1 nas três zonas
+5. **Teste no PC com NVIDIA** — correr com `quality` = 2 e 3, anotar fps com Shift+F1 nas três zonas
    (garagem, escritório, celas) e reportar. Se HIGH aguentar 60, fica HIGH por defeito no export.
-7. **Trailer** — gravar em janela (OBS ou `--record`), 50 s, com a música `theme`; cortar o que tape
-   a voz. Os renders de ontem estão em `trailer/` como referência.
-8. **Floater (inimigo voador)** — `Assets/Prefabs/floater.scene.json` e `Assets/Scripts/floater.py`
+
+6. **Floater (inimigo voador)** — `Assets/Prefabs/floater.scene.json` e `Assets/Scripts/floater.py`
    já existem com o modelo e um esqueleto com os passos em comentário: aparece a meio do mapa, voa
    na direção da jogadora a `hover_height`, dispara a cada `fire_rate` dentro de `fire_range`, leva
    dano com `take_damage` e explode. O modelo tem esqueleto mas **não tem clips de animação**: anima-se
    por poses de ossos no `Skeleton3D` (asas, antena, braços), como diz o cabeçalho do script. Referência: `enemy.py`. Quando tiver `take_damage`, entra no
    grupo `enemy` para a jogadora o poder abater.
-9. **Export** — `debug_keys` = False no nó `Game`, `activeScene` = boot, `quality` escolhido, e o
+7. **Export** — `debug_keys` = False no nó `Game`, `activeScene` = boot, `quality` escolhido, e o
    pacote com `bin/pack`. Confirmar que `source/` (blend) fica fora.
 
 ## Regras
