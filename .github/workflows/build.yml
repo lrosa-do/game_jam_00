@@ -43,3 +43,46 @@ jobs:
         with:
           name: engine-windows
           path: engine/bin
+
+  release:
+    needs: [linux, windows]
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'release')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: engine-linux
+          path: engine/bin
+      - uses: actions/download-artifact@v4
+        with:
+          name: engine-windows
+          path: win
+        continue-on-error: true
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan1 libx11-6 libxi6 libxcursor1 libxrandr2 libxinerama1 libxkbcommon0 libgl1 libegl1 zip
+          chmod +x engine/bin/*
+      - name: Export Linux
+        run: |
+          mkdir -p out/linux
+          engine/bin/export game/projecto.json -o out/linux/NULL_PROTOCOL --platform linux --runner engine/bin/runner --no-shader-cache
+          cp game/NOTAS_DE_JOGO.md out/linux/
+          (cd out/linux && zip -q -r ../NULL_PROTOCOL_linux.zip .)
+      - name: Export Windows
+        continue-on-error: true
+        run: |
+          test -f win/runner.exe
+          mkdir -p out/windows
+          engine/bin/export game/projecto.json -o out/windows/NULL_PROTOCOL.exe --platform windows --runner win/runner.exe --no-shader-cache
+          cp game/NOTAS_DE_JOGO.md out/windows/
+          (cd out/windows && zip -q -r ../NULL_PROTOCOL_windows.zip .)
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: release-${{ github.run_number }}
+          name: NULL PROTOCOL build ${{ github.run_number }}
+          body: ${{ github.event.head_commit.message }}
+          files: out/*.zip

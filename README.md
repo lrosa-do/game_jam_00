@@ -2,8 +2,9 @@
 
 Jam interno CTW, tema "AI gone wrong". `engine/` é o motor prisma3d com todas as dependências
 dentro (sem submódulos); `game/` é o jogo. O GitHub Actions compila o motor em Linux e Windows
-quando a mensagem do commit tem a palavra `release` (ou a pedido, no separador Actions) e deixa
-os binários nos artifacts.
+quando a mensagem do commit tem a palavra `release` (ou a pedido, no separador Actions), exporta o
+jogo (runner + `data.rpak`) e publica uma Release com `NULL_PROTOCOL_linux.zip` e
+`NULL_PROTOCOL_windows.zip` prontos a descarregar; os binários do motor ficam nos artifacts do run.
 
 ## Compilar
 
