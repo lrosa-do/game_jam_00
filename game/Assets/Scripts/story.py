@@ -251,6 +251,11 @@ class Story(Node):
             spot = Vec3(start[0], start[1], start[2])
         self._player.respawn(Vec3(spot.x, spot.y + 1.1, spot.z), yaw)
         self._game._floors = 0.0
+        # Whoever was shooting at her where she came from forgets it.
+        if self._game.enemies != None:
+            for enemy in self._game.enemies:
+                if not enemy._dead:
+                    enemy.calm()
         # After the move, so the blasts of the stages played go off far from her.
         self.catch_up(index)
         if index > free_at and self._unit != None:

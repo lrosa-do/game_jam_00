@@ -302,7 +302,9 @@ class Enemy(CharacterBody3D):
             dx = seen.x - p.x
             dz = seen.z - p.z
             dist = math.sqrt(dx * dx + dz * dz)
-            shooting = self._alert > 0.0 and dist <= self.shoot_range and target.alive()
+            # On the same storey only: from another floor it runs to where it last saw her
+            # instead of emptying the magazine into the slab.
+            shooting = self._alert > 0.0 and dist <= self.shoot_range and target.alive() and math.abs(seen.y - p.y) < 2.0
             # While sidestepping round an obstacle the cop looks where it goes, so the running
             # animation does not make it crab sideways; shooting still turns it on the target.
             aim = seen
@@ -464,6 +466,12 @@ class Enemy(CharacterBody3D):
             return Vec3(math.cos(angle), 0.0, math.sin(angle))
         f = (radius - d) / radius
         return Vec3(dx / d * f, 0.0, dz / d * f)
+
+    # A stage jump (debug) or a fresh start: back on guard, nothing seen, nothing heard.
+    def calm(self):
+        self._alert = 0.0
+        self._state = "guard"
+        self._stuck_from = None
 
     def shoot(self, target, delta):
         if self._pause > 0.0:
