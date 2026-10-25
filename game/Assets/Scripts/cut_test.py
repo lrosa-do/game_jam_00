@@ -34,6 +34,8 @@ class CutTest(Node3D):
             if person != None:
                 person.global_position = Vec3(x, 1.0, 0.0)
                 person.rotation_degrees = Vec3(0.0, 180.0, 0.0)
+                # The game clears a corpse after 10 s; here it stays until R.
+                person.corpse_time = 1000000.0
                 self.people.append(person)
             x = x + 2.4
         self.say("NEW ROW")
