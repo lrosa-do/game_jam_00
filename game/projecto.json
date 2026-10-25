@@ -9,7 +9,8 @@
     "Scenes/anim_test.scene.json",
     "Scenes/game.scene.json",
     "Scenes/bullet_time.scene.json",
-    "Scenes/map_view.scene.json"
+    "Scenes/map_view.scene.json",
+    "Scenes/cut_test.scene.json"
   ],
   "activeScene": "Scenes/game.scene.json",
   "searchPaths": [],

@@ -1,0 +1,121 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "Node3D",
+    "name": "CutTest",
+    "properties": {
+      "script": "Assets/Scripts/cut_test.py"
+    },
+    "children": [
+      {
+        "class": "WorldEnvironment",
+        "name": "Environment",
+        "properties": {
+          "background_mode": 2,
+          "sky_top_color": [
+            0.25,
+            0.45,
+            0.8,
+            1.0
+          ],
+          "sky_horizon_color": [
+            0.65,
+            0.7,
+            0.8,
+            1.0
+          ],
+          "sky_ground_bottom_color": [
+            0.2,
+            0.18,
+            0.16,
+            1.0
+          ],
+          "sky_ground_horizon_color": [
+            0.6,
+            0.6,
+            0.6,
+            1.0
+          ],
+          "ambient_light_sky_contribution": 1.0,
+          "tonemap_mode": 3,
+          "tonemap_exposure": 1.05,
+          "adjustment_enabled": true,
+          "adjustment_contrast": 1.08,
+          "adjustment_saturation": 0.85
+        }
+      },
+      {
+        "class": "DirectionalLight3D",
+        "name": "Sun",
+        "properties": {
+          "rotation": [
+            -0.9,
+            2.6,
+            0.0
+          ],
+          "shadow_enabled": true,
+          "light_energy": 1.4
+        }
+      },
+      {
+        "class": "StaticBody3D",
+        "name": "Floor",
+        "properties": {
+          "position": [
+            0.0,
+            -0.1,
+            0.0
+          ]
+        },
+        "children": [
+          {
+            "class": "CollisionShape3D",
+            "name": "Shape",
+            "properties": {
+              "shape_type": 1,
+              "box_size": [
+                40.0,
+                0.2,
+                24.0
+              ]
+            }
+          },
+          {
+            "class": "MeshInstance3D",
+            "name": "Mesh",
+            "properties": {
+              "mesh": "primitive:box?size=40,0.2,24",
+              "color": [
+                0.35,
+                0.36,
+                0.4,
+                1.0
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "class": "Camera3D",
+        "name": "Cam",
+        "properties": {
+          "script": "Assets/Scripts/free_camera.py",
+          "position": [
+            0.0,
+            1.5,
+            9.0
+          ],
+          "rotation_degrees": [
+            -7.0,
+            0.0,
+            0.0
+          ],
+          "current": true,
+          "fov": 55.0,
+          "far": 100.0
+        }
+      }
+    ]
+  }
+}

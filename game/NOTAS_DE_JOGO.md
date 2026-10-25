@@ -37,6 +37,8 @@ Predefinições de qualidade (`quality` no nó `Game`, 1 por defeito): LOW (720 
 
 O aspeto é tonemap ACES com contraste 1,08 e saturação 0,85 no `WorldEnvironment`. A câmara abana por trauma (explosões perto, tiros): `shake_frequency`, `shake_amplitude_x/y`, `shake_roll` no Player e `trauma_decay` no Game.
 
+A cena `Scenes/cut_test.scene.json` mostra as 7 pessoas do jogo (cop_a, cop_b, cop_female, security, bravura, prisoner, towel) em fila para testar o desmembramento: teclas 1 a 7 cortam a cabeça, os braços, os antebraços e as pernas de todos (o primeiro corte mata, os seguintes tiram mais peças), X faz o corte aleatório do jogo, Z tira todas as peças com uma explosão, R repõe a fila. Voa-se com a câmara livre e debaixo de cada nome vê-se quantas peças saíram.
+
 A cena `Scenes/bullet_time.scene.json` é uma arena vazia (jogadora, barris, caixas, pilares, sem polícias nem história) para afinar o bullet time, o mergulho e a câmara.
 
 ## Antes de jogar
