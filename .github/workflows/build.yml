@@ -15,7 +15,7 @@ jobs:
       - name: Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build glslang-tools libvulkan-dev libx11-dev libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev libxkbcommon-dev libgl-dev libasound2-dev
+          sudo apt-get install -y cmake ninja-build glslang-tools libvulkan-dev libegl1-mesa-dev libx11-dev libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev libxkbcommon-dev libgl-dev libasound2-dev
       - name: Configure
         run: cmake -S engine -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPRISMA3D_BUILD_TESTS=OFF -DPRISMA3D_WERROR=OFF -DPRISMA3D_USE_MOLD=OFF -DPRISMA3D_USE_CCACHE=OFF
       - name: Build
@@ -64,9 +64,12 @@ jobs:
       - name: Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libvulkan1 libx11-6 libxi6 libxcursor1 libxrandr2 libxinerama1 libxkbcommon0 libgl1 libegl1 zip
+          sudo apt-get install -y libvulkan1 mesa-vulkan-drivers libx11-6 libxi6 libxcursor1 libxrandr2 libxinerama1 libxkbcommon0 libgl1 libegl1 libegl-mesa0 libgl1-mesa-dri libgbm1 zip
           chmod +x engine/bin/*
       - name: Export Linux
+        env:
+          EGL_PLATFORM: surfaceless
+          LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           mkdir -p out/linux
           engine/bin/export game/projecto.json -o out/linux/NULL_PROTOCOL --platform linux --runner engine/bin/runner --no-shader-cache
@@ -74,6 +77,9 @@ jobs:
           (cd out/linux && zip -q -r ../NULL_PROTOCOL_linux.zip .)
       - name: Export Windows
         continue-on-error: true
+        env:
+          EGL_PLATFORM: surfaceless
+          LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           test -f win/runner.exe
           mkdir -p out/windows
