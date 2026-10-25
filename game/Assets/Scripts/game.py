@@ -139,6 +139,8 @@ class Game(Node3D):
     _music_level = 0.0
     music_final = False
     _icon_clicked = False
+    _img_music_on = -1
+    _img_music_off = -1
     _trauma = 0.0
     trauma_decay = 1.5  # per second, as in the Kinetix2D camera
     render_aspect = 3  # how the 3D picture fits the screen: 0 Stretch, 1 Keep, 2 Crop, 3 Expand
@@ -680,9 +682,13 @@ class Game(Node3D):
         self.music = not self.music
         self.show("MUSIC // " + ("ON" if self.music else "OFF"), 1.2)
 
-    # The speaker icon, bottom right: a click toggles the music while the mouse is free.
+    # The speaker icon, bottom right (Assets/Textures/Hud/music_on.png and music_off.png): a click
+    # toggles the music while the mouse is free.
     def draw_music_icon(self, width, height):
-        size = 26.0
+        if self._img_music_on < 0:
+            self._img_music_on = hud_load_image("Assets/Textures/Hud/music_on.png")
+            self._img_music_off = hud_load_image("Assets/Textures/Hud/music_off.png")
+        size = 32.0
         x = width - size - 14.0
         y = height - size - 14.0
         self._icon_clicked = False
@@ -693,20 +699,10 @@ class Game(Node3D):
             if over and mouse_check_button_pressed(MOUSE_LEFT):
                 self.toggle_music()
                 self._icon_clicked = True
-        color = Color(0.55, 0.9, 1.0, 0.9 if over else 0.6)
+        tint = Color(1.0, 1.0, 1.0, 1.0 if over else 0.7)
         if not self.music:
-            color = Color(1.0, 0.35, 0.3, 0.9 if over else 0.6)
-        hud_rect(x, y + size * 0.3, size * 0.3, size * 0.4, color)
-        hud_line(x + size * 0.3, y + size * 0.3, x + size * 0.55, y + size * 0.05, color, 2.0)
-        hud_line(x + size * 0.55, y + size * 0.05, x + size * 0.55, y + size * 0.95, color, 2.0)
-        hud_line(x + size * 0.55, y + size * 0.95, x + size * 0.3, y + size * 0.7, color, 2.0)
-        if self.music:
-            hud_line(x + size * 0.7, y + size * 0.35, x + size * 0.7, y + size * 0.65, color, 2.0)
-            hud_line(x + size * 0.85, y + size * 0.2, x + size * 0.85, y + size * 0.8, color, 2.0)
-            hud_line(x + size, y + size * 0.05, x + size, y + size * 0.95, color, 2.0)
-        else:
-            hud_line(x + size * 0.65, y + size * 0.3, x + size, y + size * 0.7, color, 2.0)
-            hud_line(x + size, y + size * 0.3, x + size * 0.65, y + size * 0.7, color, 2.0)
+            tint = Color(1.0, 0.5, 0.45, 1.0 if over else 0.7)
+        hud_image(self._img_music_on if self.music else self._img_music_off, x, y, size, size, 0.0, 0.0, 0.0, 1.0, 1.0, tint)
 
     # Camera shake by trauma: blasts and shots add to it, it decays, and the shake is its square.
     def add_trauma(self, amount):
