@@ -142,6 +142,104 @@ std::uint64_t positionKey(const Math::Vec3& p)
            static_cast<std::uint64_t>(z & 0x1FFFFF);
 }
 
+struct ContourPoint
+{
+    float x;
+    float y;
+};
+
+float contourArea(const ct::Vector<ContourPoint>& contour)
+{
+    const int n = static_cast<int>(contour.size());
+    float area = 0.0f;
+    for (int p = n - 1, q = 0; q < n; p = q++)
+        area += contour[static_cast<std::size_t>(p)].x * contour[static_cast<std::size_t>(q)].y -
+                contour[static_cast<std::size_t>(p)].y * contour[static_cast<std::size_t>(q)].x;
+    return area * 0.5f;
+}
+
+bool insideTriangle(float ax, float ay, float bx, float by, float cx, float cy, float px, float py,
+        bool includeEdges)
+{
+    const float ex = cx - bx;
+    const float ey = cy - by;
+    const float fx = ax - cx;
+    const float fy = ay - cy;
+    const float gx = bx - ax;
+    const float gy = by - ay;
+    const float apx = px - ax;
+    const float apy = py - ay;
+    const float bpx = px - bx;
+    const float bpy = py - by;
+    const float cpx = px - cx;
+    const float cpy = py - cy;
+    const float aCrossBp = ex * bpy - ey * bpx;
+    const float cCrossAp = gx * apy - gy * apx;
+    const float bCrossCp = fx * cpy - fy * cpx;
+    if (includeEdges) return aCrossBp > 0.0f && bCrossCp > 0.0f && cCrossAp > 0.0f;
+    return aCrossBp >= 0.0f && bCrossCp >= 0.0f && cCrossAp >= 0.0f;
+}
+
+bool snip(const ct::Vector<ContourPoint>& contour, int u, int v, int w, int n,
+        const ct::Vector<int>& values, bool relaxed)
+{
+    const ContourPoint& a = contour[static_cast<std::size_t>(values[static_cast<std::size_t>(u)])];
+    const ContourPoint& b = contour[static_cast<std::size_t>(values[static_cast<std::size_t>(v)])];
+    const ContourPoint& c = contour[static_cast<std::size_t>(values[static_cast<std::size_t>(w)])];
+    const float threshold = relaxed ? -0.00001f : 0.00001f;
+    if (threshold > ((b.x - a.x) * (c.y - a.y)) - ((b.y - a.y) * (c.x - a.x))) return false;
+    for (int p = 0; p < n; ++p)
+    {
+        if (p == u || p == v || p == w) continue;
+        const ContourPoint& q =
+                contour[static_cast<std::size_t>(values[static_cast<std::size_t>(p)])];
+        if (insideTriangle(a.x, a.y, b.x, b.y, c.x, c.y, q.x, q.y, relaxed)) return false;
+    }
+    return true;
+}
+
+// Ear clipping: the polygon is cut into triangles between its own corners, counter-clockwise.
+bool triangulate(const ct::Vector<ContourPoint>& contour, ct::Vector<int>& result)
+{
+    const int n = static_cast<int>(contour.size());
+    if (n < 3) return false;
+    ct::Vector<int> order;
+    order.resize(static_cast<std::size_t>(n));
+    if (0.0f < contourArea(contour))
+        for (int v = 0; v < n; ++v) order[static_cast<std::size_t>(v)] = v;
+    else
+        for (int v = 0; v < n; ++v) order[static_cast<std::size_t>(v)] = (n - 1) - v;
+    bool relaxed = false;
+    int nv = n;
+    int count = 2 * nv;
+    for (int v = nv - 1; nv > 2;)
+    {
+        if (0 >= (count--))
+        {
+            if (relaxed) return false;
+            count = 2 * nv;
+            relaxed = true;
+        }
+        int u = v;
+        if (nv <= u) u = 0;
+        v = u + 1;
+        if (nv <= v) v = 0;
+        int w = v + 1;
+        if (nv <= w) w = 0;
+        if (snip(contour, u, v, w, nv, order, relaxed))
+        {
+            result.push_back(order[static_cast<std::size_t>(u)]);
+            result.push_back(order[static_cast<std::size_t>(v)]);
+            result.push_back(order[static_cast<std::size_t>(w)]);
+            for (int a = v, b = v + 1; b < nv; ++a, ++b)
+                order[static_cast<std::size_t>(a)] = order[static_cast<std::size_t>(b)];
+            --nv;
+            count = 2 * nv;
+        }
+    }
+    return true;
+}
+
 struct CapEdge
 {
     std::uint32_t from;
@@ -265,52 +363,92 @@ void addCaps(const SurfaceData& in, const ct::Vector<int>& triGroup,
             for (std::size_t r = 0; r < pair.size(); ++r)
             {
                 if (ring[r] != r) continue;
-                Math::Vec3 centre(0.0f, 0.0f, 0.0f);
-                Math::Vec2 uv(0.0f, 0.0f);
-                int count = 0;
+                // The ring in order: each edge runs as its triangle winds, the next one starts
+                // where it ends. An open chain (the rest of the ring is in another surface) is
+                // closed from its last corner to its first.
+                ct::HashMap<std::uint64_t, std::uint32_t> startsAt;
                 for (std::size_t i = 0; i < pair.size(); ++i)
+                    if (ring[i] == r)
+                        startsAt[weld[edges[pair[i]].from]] = static_cast<std::uint32_t>(i);
+                ct::Vector<int> used;
+                used.resize(pair.size());
+                for (std::size_t i = 0; i < pair.size(); ++i) used[i] = 0;
+                for (std::size_t seed = 0; seed < pair.size(); ++seed)
                 {
-                    if (ring[i] != r) continue;
-                    centre = centre + in.positions[edges[pair[i]].from];
-                    if (!in.uvs.empty()) uv = uv + in.uvs[edges[pair[i]].from];
-                    ++count;
-                }
-                if (count < 3) continue;
-                const float scale = 1.0f / static_cast<float>(count);
-                centre = centre * scale;
-                uv = uv * scale;
-                Math::Vec3 normal(0.0f, 0.0f, 0.0f);
-                for (std::size_t i = 0; i < pair.size(); ++i)
-                {
-                    if (ring[i] != r) continue;
-                    const CapEdge& edge = edges[pair[i]];
-                    normal = normal + Math::Vec3::Cross(in.positions[edge.to] - centre,
-                                              in.positions[edge.from] - centre);
-                }
-                const float length = normal.Length();
-                if (length < 1e-12f) continue;
-                normal = normal * (1.0f / length);
-
-                // The rim: copies of the boundary corners with the group's weights and the cap
-                // normal; the tangent is turned to lie in the cap.
-                const std::size_t rimStart = out.positions.size();
-                ct::HashMap<std::uint64_t, std::uint32_t> rim;
-                ct::Vector<std::uint32_t> fan;
-                for (std::size_t i = 0; i < pair.size(); ++i)
-                {
-                    if (ring[i] != r) continue;
-                    const std::uint32_t corner[2] = { edges[pair[i]].from, edges[pair[i]].to };
-                    std::uint32_t index[2];
-                    for (int c = 0; c < 2; ++c)
+                    if (ring[seed] != r || used[seed]) continue;
+                    // Walk back to the start of an open chain, so it is taken whole.
+                    std::size_t head = seed;
                     {
-                        const std::uint32_t* found = rim.find(corner[c]);
-                        if (found)
+                        ct::HashMap<std::uint64_t, std::uint32_t> endsAt;
+                        for (std::size_t i = 0; i < pair.size(); ++i)
+                            if (ring[i] == r && !used[i])
+                                endsAt[weld[edges[pair[i]].to]] = static_cast<std::uint32_t>(i);
+                        for (std::size_t guard = 0; guard < pair.size(); ++guard)
                         {
-                            index[c] = *found;
-                            continue;
+                            const std::uint32_t* before = endsAt.find(weld[edges[pair[head]].from]);
+                            if (!before || *before == seed) break;
+                            head = *before;
                         }
-                        index[c] = static_cast<std::uint32_t>(out.positions.size());
-                        copyVertex(in, corner[c], g, partOfBone, partBones[g], segments, out);
+                    }
+                    ct::Vector<std::uint32_t> loop;
+                    std::size_t at = head;
+                    for (std::size_t guard = 0; guard < pair.size() && !used[at]; ++guard)
+                    {
+                        used[at] = 1;
+                        loop.push_back(edges[pair[at]].from);
+                        const std::uint32_t* next = startsAt.find(weld[edges[pair[at]].to]);
+                        if (!next || used[*next])
+                        {
+                            if (!next) loop.push_back(edges[pair[at]].to);
+                            break;
+                        }
+                        at = *next;
+                    }
+                    if (loop.size() < 3) continue;
+                    // The cap faces out of the group: against the direction its triangles run
+                    // along the ring.
+                    ct::Vector<std::uint32_t> polygon;
+                    for (std::size_t i = loop.size(); i > 0; --i) polygon.push_back(loop[i - 1]);
+
+                    Math::Vec3 normal(0.0f, 0.0f, 0.0f);
+                    Math::Vec3 centre(0.0f, 0.0f, 0.0f);
+                    for (std::size_t i = 0; i < polygon.size(); ++i)
+                    {
+                        const Math::Vec3& a = in.positions[polygon[i]];
+                        const Math::Vec3& b = in.positions[polygon[(i + 1) % polygon.size()]];
+                        normal = normal + Math::Vec3((a.y - b.y) * (a.z + b.z),
+                                                  (a.z - b.z) * (a.x + b.x),
+                                                  (a.x - b.x) * (a.y + b.y));
+                        centre = centre + a;
+                    }
+                    const float length = normal.Length();
+                    if (length < 1e-12f) continue;
+                    normal = normal * (1.0f / length);
+                    centre = centre * (1.0f / static_cast<float>(polygon.size()));
+                    const Math::Vec3 helper = fabsf(normal.x) < 0.9f ? Math::Vec3(1.0f, 0.0f, 0.0f)
+                                                                     : Math::Vec3(0.0f, 1.0f, 0.0f);
+                    Math::Vec3 axisU = Math::Vec3::Cross(helper, normal);
+                    axisU = axisU * (1.0f / axisU.Length());
+                    const Math::Vec3 axisV = Math::Vec3::Cross(normal, axisU);
+                    ct::Vector<ContourPoint> contour;
+                    for (std::size_t i = 0; i < polygon.size(); ++i)
+                    {
+                        const Math::Vec3 d = in.positions[polygon[i]] - centre;
+                        ContourPoint point;
+                        point.x = d.Dot(axisU);
+                        point.y = d.Dot(axisV);
+                        contour.push_back(point);
+                    }
+                    ct::Vector<int> triangles;
+                    if (!triangulate(contour, triangles)) continue;
+
+                    // The cap's own corners: the group's weights, the cap normal, the tangent in
+                    // the cap's plane.
+                    ct::Vector<std::uint32_t> corner;
+                    for (std::size_t i = 0; i < polygon.size(); ++i)
+                    {
+                        corner.push_back(static_cast<std::uint32_t>(out.positions.size()));
+                        copyVertex(in, polygon[i], g, partOfBone, partBones[g], segments, out);
                         if (!out.normals.empty()) out.normals.back() = normal;
                         if (!out.tangents.empty())
                         {
@@ -321,55 +459,13 @@ void addCaps(const SurfaceData& in, const ct::Vector<int>& triGroup,
                             if (axisLength > 1e-6f) axis = axis * (1.0f / axisLength);
                             tangent = Math::Vec4(axis.x, axis.y, axis.z, tangent.w);
                         }
-                        rim[corner[c]] = index[c];
                     }
-                    fan.push_back(index[1]);
-                    fan.push_back(index[0]);
-                }
-
-                // The centre: the mean of the rim's weights (the four heaviest bones), so it bends
-                // with the rim instead of following a single bone.
-                float boneWeight[256] = {};
-                for (std::size_t v = rimStart; v < out.positions.size(); ++v)
-                {
-                    const Math::Vec4& w = out.weights[v];
-                    const float weights[4] = { w.x, w.y, w.z, w.w };
-                    for (int j = 0; j < 4; ++j)
-                        boneWeight[(out.joints[v] >> (8 * j)) & 0xFFu] += weights[j];
-                }
-                std::uint32_t hubJoints = 0;
-                float hubWeights[4] = {};
-                float hubSum = 0.0f;
-                for (int j = 0; j < 4; ++j)
-                {
-                    int best = -1;
-                    for (int b = 0; b < 256; ++b)
-                        if (boneWeight[b] > 0.0f && (best < 0 || boneWeight[b] > boneWeight[best]))
-                            best = b;
-                    if (best < 0) break;
-                    hubJoints |= static_cast<std::uint32_t>(best) << (8 * j);
-                    hubWeights[j] = boneWeight[best];
-                    hubSum += boneWeight[best];
-                    boneWeight[best] = 0.0f;
-                }
-                if (hubSum <= 0.0f) continue;
-
-                const std::uint32_t hub = static_cast<std::uint32_t>(out.positions.size());
-                const std::uint32_t first = static_cast<std::uint32_t>(rimStart);
-                out.positions.push_back(centre);
-                if (!out.normals.empty()) out.normals.push_back(normal);
-                if (!out.tangents.empty()) out.tangents.push_back(out.tangents[first]);
-                if (!out.colors.empty()) out.colors.push_back(out.colors[first]);
-                if (!out.uvs.empty()) out.uvs.push_back(uv);
-                if (!out.uvs2.empty()) out.uvs2.push_back(out.uvs2[first]);
-                out.joints.push_back(hubJoints);
-                out.weights.push_back(Math::Vec4(hubWeights[0] / hubSum, hubWeights[1] / hubSum,
-                        hubWeights[2] / hubSum, hubWeights[3] / hubSum));
-                for (std::size_t i = 0; i + 1 < fan.size(); i += 2)
-                {
-                    out.indices.push_back(hub);
-                    out.indices.push_back(fan[i]);
-                    out.indices.push_back(fan[i + 1]);
+                    for (std::size_t i = 0; i + 2 < triangles.size(); i += 3)
+                    {
+                        out.indices.push_back(corner[static_cast<std::size_t>(triangles[i])]);
+                        out.indices.push_back(corner[static_cast<std::size_t>(triangles[i + 1])]);
+                        out.indices.push_back(corner[static_cast<std::size_t>(triangles[i + 2])]);
+                    }
                 }
             }
         }
