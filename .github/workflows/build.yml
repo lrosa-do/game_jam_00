@@ -1,13 +1,15 @@
 name: build
 
+# Runs when the commit message says "release" (for example "release: build 3"), or by hand from
+# the Actions tab; ordinary pushes do not build.
 on:
   push:
-  pull_request:
   workflow_dispatch:
 
 jobs:
   linux:
     runs-on: ubuntu-24.04
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'release')
     steps:
       - uses: actions/checkout@v4
       - name: Dependencies
@@ -25,6 +27,7 @@ jobs:
 
   windows:
     runs-on: windows-latest
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'release')
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4

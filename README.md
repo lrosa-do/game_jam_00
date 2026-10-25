@@ -1,8 +1,9 @@
 # game_jam_00 — NULL PROTOCOL
 
 Jam interno CTW, tema "AI gone wrong". `engine/` é o motor prisma3d com todas as dependências
-dentro (sem submódulos); `game/` é o jogo. O GitHub Actions compila o motor em Linux e Windows a
-cada push e deixa os binários nos artifacts.
+dentro (sem submódulos); `game/` é o jogo. O GitHub Actions compila o motor em Linux e Windows
+quando a mensagem do commit tem a palavra `release` (ou a pedido, no separador Actions) e deixa
+os binários nos artifacts.
 
 ## Compilar
 
