@@ -9,7 +9,7 @@ class Unit7(CharacterBody3D):
     follow_distance = 1.8
     gravity = 18.0
     turn_speed = 420.0
-    model_yaw = 0.0
+    model_yaw = 180.0
     health = 400.0
     attack_range = 2.2
     attack_cooldown = 1.3
@@ -107,7 +107,10 @@ class Unit7(CharacterBody3D):
         p = self.global_position
         best = None
         best_d = self.attack_range
-        for enemy in self._game.enemies:
+        # Cops and bomb carriers alike (the kamikazes are in the group "bot").
+        for enemy in self._game.enemies + self.get_tree().get_nodes_in_group("bot"):
+            if enemy._dead:
+                continue
             e = enemy.global_position
             d = math.sqrt((e.x - p.x) * (e.x - p.x) + (e.z - p.z) * (e.z - p.z))
             if d < best_d and math.abs(e.y - p.y) < 1.5:
@@ -162,6 +165,10 @@ class Unit7(CharacterBody3D):
             # Held where she was placed: the seated pose sits lower than the capsule, which the
             # mattress would push up into the air.
             self.play("Sit_Hands_on_Head_Lean_Back", 1.0)
+            # She faces whoever comes to the bars.
+            if dist < 8.0:
+                self.turn_to(dx, dz, delta)
+                self.rotation_degrees = Vec3(0.0, self._yaw, 0.0)
             return
         else:
             if self._light != None:
