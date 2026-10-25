@@ -506,7 +506,7 @@ class Enemy(CharacterBody3D):
         elif hit != None and hit.node != None and (hit.node.is_in_group("unit7") or hit.node.is_in_group("spider")):
             hit.node.take_damage(self.damage, hit.position, direction, 0.3, self)
         elif hit != None and hit.node != None and hit.node.is_in_group("breakable"):
-            hit.node.get_node("Breakable").hit(hit.position, hit.normal, direction, self.damage)
+            hit.node.get_node("Breakable").hit(hit.position, hit.normal, direction, self.damage, self)
 
     def speak(self, kind):
         voice = self.get_node("Voice")
