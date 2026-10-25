@@ -1,0 +1,41 @@
+Render (o que falta das áreas 12 a 17)
+
+Oclusão ambiente e sombras de contacto (área 13). O pré-passo de profundidade está feito, estas duas não.
+Reflexos no ecrã (área 14).
+Godrays do Radion (área 17).
+Anti-aliasing além do MSAA. Há multiamostragem; o plano ainda lista anti-aliasing como por fazer.
+Probes de reflexão: os dados, o nó e o atlas estão feitos. Não confirmei se a captura das seis faces (alínea c) ficou fechada.
+Níveis de detalhe das árvores, que o plano marca como fraqueza por resolver.
+Água e oceano (o que sobrou)
+
+Câmara debaixo de água, cáusticas e sombra do oceano.
+Leitura assíncrona da altura e flutuação na física.
+Perfil de Gerstner para quando não há compute.
+Céu a partir de seis faces separadas.
+Física
+
+Zonas de gatilho, raios e varrimentos como nós (alínea h).
+Demos em falta: personagem e quebra de objetos. Vários demos de física ainda esperam a tua validação a olho.
+O que falta na própria Kinetix: deteção contínua, gravidade por corpo, bloqueio de eixos, formas compostas.
+Animação
+
+Ligar clips de outro ficheiro ao esqueleto por nome de osso, para os FBX do Mixamo, e a animação no lugar.
+Cabelo: dissolução por distância e o demo no Sinbad.
+Fundações que ainda não existem (itens 15 a 17 e 21 a 23)
+
+Registo de classes e propriedades por nome. É a base de tudo o resto desta lista.
+Serialização: cenas em texto, recursos por caminho, formato binário.
+Prefabs.
+Editor (o plano está em docs/EDITOR.md, não arranca sem dizeres).
+Scripts com zenpy, que puseste para o fim.
+Web e Android: o perfil reduzido. Os shaders já saem em ESSL, mas o caminho sem compute não está feito.
+Demos e jogo
+
+Demo do atropelamento (carro, zombie para ragdoll, sangue).
+Jogo de exemplo: o porte do gtest_game do Nord.
+Decisões tuas pendentes
+
+NodeClass está cheio (64 bits): o próximo nó novo já não tem bit, e o Ocean3D ficou sem ele.
+Registo de mensagens do engine, para os demos deixarem o printf.
+Os problemas encontrados no Pixmap original.
+Tirar desc.showAfterFirstPresent = false do prisma-rally.
