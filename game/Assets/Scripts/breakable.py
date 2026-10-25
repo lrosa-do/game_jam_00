@@ -49,6 +49,9 @@ def breakable_kind(name):
 
 # The physics layer the hinged doors live on (layer 2), apart from the level geometry.
 DOOR_LAYER = 2
+# A leaf torn off its hinge: on its own layer, meeting the level only, so nobody gets wedged on it in
+# the doorway.
+BLOWN_LAYER = 4
 
 class Breakable(Node3D):
     kind = "glass"
@@ -486,8 +489,8 @@ class Breakable(Node3D):
             self._hinge.queue_free()
             self._hinge = None
             self._body.mass = 35.0
-            self._body.collision_layer = 1 | DOOR_LAYER
-            self._body.collision_mask = 1 | DOOR_LAYER
+            self._body.collision_layer = BLOWN_LAYER
+            self._body.collision_mask = 1
             self._body.linear_velocity = Vec3(direction.x * speed, 1.5 + direction.y * speed * 0.5, direction.z * speed)
             self._body.angular_velocity = Vec3(math.random(-3.0, 3.0), math.random(-6.0, 6.0), math.random(-3.0, 3.0))
             kind = "metal" if self.metal_door() else "wood"
@@ -498,6 +501,8 @@ class Breakable(Node3D):
             return
         door = self.debris(self._mesh, self._box, c, Vec3(direction.x * speed, 1.5 + direction.y * speed * 0.5, direction.z * speed), Vec3(math.random(-3.0, 3.0), math.random(-6.0, 6.0), math.random(-3.0, 3.0)))
         door.mass = 35.0
+        door.collision_layer = BLOWN_LAYER
+        door.collision_mask = 1
         self.attach_lightmap_parts(self._body, door, c)
         kind = "metal" if self.metal_door() else "wood"
         self.play("Assets/Sounds/break/door_" + kind + "_break_" + ["A", "B"][int(math.random(0.0, 1.99))] + ".ogg", 1.0)

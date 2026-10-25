@@ -25,6 +25,10 @@ class Spider(CharacterBody3D):
     _health = 120.0
     _fx = None
     leash = 2.0
+    lost_distance = 9.0  # metres from her: the body is dropped and rebuilt at her side
+    stuck_time = 2.5     # seconds without moving while it should: the same
+    _stuck = 0.0
+    _last = None
     _anchor = None
     _settled = False
     _still = 0.0
@@ -163,6 +167,7 @@ class Spider(CharacterBody3D):
             return
         self.step(delta)
         self._phys_cur = self.global_position
+        self.check_lost(delta)
 
     def step(self, delta):
         self._cool = math.max(self._cool - delta, 0.0)
@@ -372,6 +377,42 @@ class Spider(CharacterBody3D):
         self.done()
         if self._game != None:
             self._game.show("SPIDER // RECALIBRATED", 2.0)
+
+    # Too far from her, or stuck against something while following: the body is dropped where it
+    # is (the build effect in reverse) and the core is rebuilt at her side (game.spider_lost).
+    def check_lost(self, delta):
+        if self._wrecked or self._state != "follow" or self._settled or self._game == None:
+            self._stuck = 0.0
+            return
+        p = self.global_position
+        q = self._player.global_position
+        dx = p.x - q.x
+        dz = p.z - q.z
+        far = dx * dx + dz * dz > self.lost_distance * self.lost_distance or math.abs(p.y - q.y) > 3.0
+        if self._last != None:
+            mx = p.x - self._last.x
+            mz = p.z - self._last.z
+            if mx * mx + mz * mz < 0.0004:
+                self._stuck = self._stuck + delta
+            else:
+                self._stuck = 0.0
+        self._last = Vec3(p.x, p.y, p.z)
+        if far or self._stuck > self.stuck_time:
+            self.recall()
+
+    def recall(self):
+        if self._wrecked:
+            return
+        self._wrecked = True
+        if self._fx != None:
+            self._fx.body = None
+            self._fx = None
+        fx = self._game.instantiate("Assets/Prefabs/impact.scene.json")
+        if fx != None:
+            fx.global_position = self.global_position
+            fx.burst(Vec3(0.0, 1.0, 0.0), 1.5)
+        self._game.spider_lost()
+        self.queue_free()
 
     # Caught in a blast: the body is lost, the core goes back to the android (game.spider_lost).
     def wreck(self):
