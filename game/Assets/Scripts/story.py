@@ -379,6 +379,23 @@ class Story(Node):
             self.next()
 
     # Hold E by the target for a number of seconds; cops answer while it runs.
+    # The terminal she has to hack is shot to pieces: NULL//OS ends the session (the death and the
+    # respawn at the start of the stage are the game over the night has).
+    def terminal_broken(self, center):
+        kind = STAGES[self._stage][2] if self._stage >= 0 else ""
+        if (kind != "hack" and kind != "upload") or self._target == None or self._done:
+            return
+        t = self._target
+        if (t.x - center.x) * (t.x - center.x) + (t.z - center.z) * (t.z - center.z) > 1.0:
+            return
+        player = self._player
+        if player == None or not player.alive():
+            return
+        player.take_damage(100000.0, player.global_position, Vec3(0.0, 0.0, 1.0), 2.0, None)
+        self._game.show("TERMINAL LOST // GAME OVER", 3.5)
+        self._game._glitch = 1.5
+        self._game._flash = 0.3
+
     def update_hold(self, delta, seconds):
         self._hacking = False
         if self._target == None:

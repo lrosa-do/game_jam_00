@@ -252,6 +252,9 @@ class Breakable(Node3D):
             return
         self._broken = True
         c = self.center()
+        scene = self.effects_parent()
+        if scene != None and scene.is_in_group("game") and scene.story != None:
+            scene.story.terminal_broken(c)
         fx = self.spawn("Assets/Prefabs/impact.scene.json", point)
         if fx != None:
             fx.burst(normal, 1.6)
