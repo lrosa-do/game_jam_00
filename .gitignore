@@ -4,3 +4,4 @@ engine/bin/
 *.rpak
 out/
 .cache/
+.claude/
