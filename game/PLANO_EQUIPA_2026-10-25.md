@@ -64,7 +64,7 @@ sem linhas `[ERROR]`. Correr antes de cada commit que toque em scripts.
    vermelho, câmara lenta 1 s e o texto; no fim, ecrã de resultados (KILLS, TEMPO, HUMANS
    TERMINATED / SPARED, TRUST, veredito "gone right" só se poupou civis), ENTER volta ao menu.
 
-4. **Menu inicial** — `Scenes/boot.scene.json`, `boot.py`: fundo com as imagens `BACK_0.png` e `BACK_1.png` (1672x941) e o logo `ICON.png` (com alfa), a copiar para `Assets/Textures/Menu/`; START (ENTER ou clique), QUIT (ESC), logo CTW; antes de
+4. **Menu inicial** — `Scenes/boot.scene.json`, `boot.py`: fundo com `Assets/Textures/Menu/menu_street.png` e `menu_lab.png` (1672x941) e o logo `logo.png` (com alfa), já na pasta; START (ENTER ou clique), QUIT (ESC), logo CTW; antes de
    exportar `activeScene` passa a `Scenes/boot.scene.json`.
 5. **Teste no PC com NVIDIA** — correr com `quality` = 2 e 3, anotar fps com Shift+F1 nas três zonas
    (garagem, escritório, celas) e reportar. Se HIGH aguentar 60, fica HIGH por defeito no export.

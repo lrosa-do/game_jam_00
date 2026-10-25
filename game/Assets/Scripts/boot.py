@@ -10,7 +10,7 @@ class Boot(Node):
     _frames = 0
 
     def _ready(self):
-        self._img = hud_load_image("Assets/Textures/Menu/back_0.png")
+        self._img = hud_load_image("Assets/Textures/Menu/menu_street.png")
         mouse_set_mode(MOUSE_MODE_HIDDEN)
 
     def _process(self, delta):
