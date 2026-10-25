@@ -26,6 +26,7 @@ add_library(prisma3d ${PRISMA3D_LIBRARY_TYPE}
   src/prisma3d/render/LoadedMaterialLibrary.cpp
   src/prisma3d/render/AssetLoader.cpp
   src/prisma3d/render/MeshStore.cpp
+  src/prisma3d/render/MeshSlice.cpp
   src/prisma3d/render/MultiMeshStorage.cpp
   src/prisma3d/render/ImpostorManager.cpp
   src/prisma3d/render/SceneMaterial.cpp

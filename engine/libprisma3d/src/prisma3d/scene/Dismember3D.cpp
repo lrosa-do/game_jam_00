@@ -1,5 +1,6 @@
 #include "prisma3d/scene/Dismember3D.h"
 
+#include "prisma3d/render/MeshSlice.h"
 #include "prisma3d/scene/NodeClassDB.h"
 #include "prisma3d/scene/Skeleton3D.h"
 #include "prisma3d/scene/VisualInstance3D.h"
@@ -10,6 +11,18 @@
 
 namespace prisma3d
 {
+
+// Where two ragdoll parts meet: the plane through the joint that splits their pieces, and the
+// reach of the band of triangles it cuts (the rest of the body is left alone).
+struct PieceJoint
+{
+    Math::Vec3 point;
+    Math::Vec3 normal;
+    float radius = 0.0f;
+    float band = 0.0f;
+    int parent = 0;
+    int child = 0;
+};
 
 struct DismemberSegment
 {
@@ -84,6 +97,161 @@ int nearestBoneOf(const Math::Vec3& point, int part, const ct::Vector<int>& grou
         }
     }
     return bone;
+}
+
+int nearestGroup(const SurfaceData& in, const std::uint32_t* corners,
+        const ct::Vector<DismemberSegment>& segments)
+{
+    const Math::Vec3 centre =
+            (in.positions[corners[0]] + in.positions[corners[1]] + in.positions[corners[2]]) *
+            (1.0f / 3.0f);
+    int group = 0;
+    float best = 3.4e38f;
+    for (std::size_t k = 0; k < segments.size(); ++k)
+    {
+        const float d = segmentDistance2(centre, segments[k].from, segments[k].to);
+        if (d < best)
+        {
+            best = d;
+            group = segments[k].group;
+        }
+    }
+    return group;
+}
+
+// A vertex where the skeleton holds it now, laid in the frame of a ragdoll part.
+void bakeVertex(const SurfaceData& in, std::uint32_t vertex, const ct::Vector<Math::Mat4>& palette,
+        const Math::Mat4& toPart, SurfaceData& out)
+{
+    Math::Vec3 position(0.0f, 0.0f, 0.0f);
+    Math::Vec3 normal(0.0f, 0.0f, 0.0f);
+    Math::Vec3 tangent(0.0f, 0.0f, 0.0f);
+    const Math::Vec3 restNormal =
+            in.normals.empty() ? Math::Vec3(0.0f, 1.0f, 0.0f) : in.normals[vertex];
+    const Math::Vec3 restTangent = in.tangents.empty()
+                                           ? Math::Vec3(1.0f, 0.0f, 0.0f)
+                                           : Math::Vec3(in.tangents[vertex].x,
+                                                     in.tangents[vertex].y, in.tangents[vertex].z);
+    float total = 0.0f;
+    const bool skinned =
+            in.joints.size() == in.positions.size() && in.weights.size() == in.positions.size();
+    for (int j = 0; skinned && j < 4; ++j)
+    {
+        const float weight = (&in.weights[vertex].x)[j];
+        const std::size_t bone = (in.joints[vertex] >> (8 * j)) & 0xFFu;
+        if (weight <= 0.0f || bone >= palette.size()) continue;
+        position = position + palette[bone].TransformPoint(in.positions[vertex]) * weight;
+        normal = normal + palette[bone].TransformVector(restNormal) * weight;
+        tangent = tangent + palette[bone].TransformVector(restTangent) * weight;
+        total += weight;
+    }
+    if (total > 0.0f) position = position * (1.0f / total);
+    else
+    {
+        position = in.positions[vertex];
+        normal = restNormal;
+        tangent = restTangent;
+    }
+    out.positions.push_back(toPart.TransformPoint(position));
+    if (!in.normals.empty()) out.normals.push_back(toPart.TransformVector(normal).Normalized());
+    if (!in.tangents.empty())
+    {
+        const Math::Vec3 t = toPart.TransformVector(tangent).Normalized();
+        out.tangents.push_back(Math::Vec4(t.x, t.y, t.z, in.tangents[vertex].w));
+    }
+    if (!in.colors.empty()) out.colors.push_back(in.colors[vertex]);
+    if (!in.uvs.empty()) out.uvs.push_back(in.uvs[vertex]);
+    if (!in.uvs2.empty()) out.uvs2.push_back(in.uvs2[vertex]);
+}
+
+void takeTriangles(const SurfaceData& in, const ct::Vector<int>& triangles, ct::Vector<int>& remap,
+        SurfaceData& out)
+{
+    out = SurfaceData();
+    out.topology = in.topology;
+    remap.resize(in.positions.size());
+    for (std::size_t v = 0; v < remap.size(); ++v) remap[v] = -1;
+    for (std::size_t i = 0; i < triangles.size(); ++i)
+        for (std::size_t c = 0; c < 3; ++c)
+        {
+            const std::uint32_t vertex = in.indices[static_cast<std::size_t>(triangles[i]) * 3 + c];
+            if (remap[vertex] < 0)
+            {
+                remap[vertex] = static_cast<int>(out.positions.size());
+                out.positions.push_back(in.positions[vertex]);
+                if (!in.normals.empty()) out.normals.push_back(in.normals[vertex]);
+                if (!in.tangents.empty()) out.tangents.push_back(in.tangents[vertex]);
+                if (!in.colors.empty()) out.colors.push_back(in.colors[vertex]);
+                if (!in.uvs.empty()) out.uvs.push_back(in.uvs[vertex]);
+                if (!in.uvs2.empty()) out.uvs2.push_back(in.uvs2[vertex]);
+            }
+            out.indices.push_back(static_cast<std::uint32_t>(remap[vertex]));
+        }
+}
+
+void appendSurface(const SurfaceData& in, SurfaceData& out)
+{
+    const std::uint32_t base = static_cast<std::uint32_t>(out.positions.size());
+    for (std::size_t v = 0; v < in.positions.size(); ++v)
+    {
+        out.positions.push_back(in.positions[v]);
+        if (!in.normals.empty()) out.normals.push_back(in.normals[v]);
+        if (!in.tangents.empty()) out.tangents.push_back(in.tangents[v]);
+        if (!in.colors.empty()) out.colors.push_back(in.colors[v]);
+        if (!in.uvs.empty()) out.uvs.push_back(in.uvs[v]);
+        if (!in.uvs2.empty()) out.uvs2.push_back(in.uvs2[v]);
+    }
+    for (std::size_t i = 0; i < in.indices.size(); ++i) out.indices.push_back(base + in.indices[i]);
+}
+
+void moveSurface(SurfaceData& surface, const Math::Mat4& transform)
+{
+    for (std::size_t v = 0; v < surface.positions.size(); ++v)
+        surface.positions[v] = transform.TransformPoint(surface.positions[v]);
+    for (std::size_t v = 0; v < surface.normals.size(); ++v)
+        surface.normals[v] = transform.TransformVector(surface.normals[v]).Normalized();
+    for (std::size_t v = 0; v < surface.tangents.size(); ++v)
+    {
+        Math::Vec4& t = surface.tangents[v];
+        const Math::Vec3 axis = transform.TransformVector(Math::Vec3(t.x, t.y, t.z)).Normalized();
+        t = Math::Vec4(axis.x, axis.y, axis.z, t.w);
+    }
+}
+
+// The joint whose band a triangle falls in, among those between its own part and another: the one
+// whose plane runs nearest to it. -1 when the triangle is away from every cut.
+int bandOf(const SurfaceData& posed, std::size_t triangle, int part,
+        const ct::Vector<PieceJoint>& joints)
+{
+    const Math::Vec3* corner[3];
+    for (std::size_t c = 0; c < 3; ++c)
+        corner[c] = &posed.positions[posed.indices[triangle * 3 + c]];
+    const Math::Vec3 centre = (*corner[0] + *corner[1] + *corner[2]) * (1.0f / 3.0f);
+    int best = -1;
+    float bestGap = 3.4e38f;
+    for (std::size_t j = 0; j < joints.size(); ++j)
+    {
+        const PieceJoint& joint = joints[j];
+        if (joint.parent != part && joint.child != part) continue;
+        if ((centre - joint.point).Length() > joint.radius) continue;
+        float low = 3.4e38f;
+        float high = -3.4e38f;
+        for (std::size_t c = 0; c < 3; ++c)
+        {
+            const float d = joint.normal.Dot(*corner[c] - joint.point);
+            low = d < low ? d : low;
+            high = d > high ? d : high;
+        }
+        if (low > joint.band || high < -joint.band) continue;
+        // How far the triangle is from the plane; nothing when it lies across it.
+        const float gap = low > 0.0f ? low : (high < 0.0f ? -high : 0.0f);
+        if (gap < bestGap)
+        {
+            bestGap = gap;
+            best = static_cast<int>(j);
+        }
+    }
+    return best;
 }
 
 void copyVertex(const SurfaceData& in, std::uint32_t vertex, int part,
@@ -407,8 +575,17 @@ void addCaps(const SurfaceData& in, const ct::Vector<int>& triGroup,
                     if (loop.size() < 3) continue;
                     // The cap faces out of the group: against the direction its triangles run
                     // along the ring.
+                    // Corners that sit on the same spot (a texture seam doubles them) are one.
                     ct::Vector<std::uint32_t> polygon;
-                    for (std::size_t i = loop.size(); i > 0; --i) polygon.push_back(loop[i - 1]);
+                    for (std::size_t i = loop.size(); i > 0; --i)
+                    {
+                        const std::uint32_t corner = loop[i - 1];
+                        if (!polygon.empty() && weld[polygon.back()] == weld[corner]) continue;
+                        polygon.push_back(corner);
+                    }
+                    while (polygon.size() > 1 && weld[polygon.back()] == weld[polygon[0]])
+                        polygon.pop_back();
+                    if (polygon.size() < 3) continue;
 
                     Math::Vec3 normal(0.0f, 0.0f, 0.0f);
                     Math::Vec3 centre(0.0f, 0.0f, 0.0f);
@@ -440,7 +617,19 @@ void addCaps(const SurfaceData& in, const ct::Vector<int>& triGroup,
                         contour.push_back(point);
                     }
                     ct::Vector<int> triangles;
-                    if (!triangulate(contour, triangles)) continue;
+                    if (!triangulate(contour, triangles))
+                    {
+                        // A ring that folds over itself in its plane: a strip from its first
+                        // corner, still between corners of the ring.
+                        triangles.clear();
+                        const bool counter = contourArea(contour) > 0.0f;
+                        for (std::size_t i = 1; i + 1 < polygon.size(); ++i)
+                        {
+                            triangles.push_back(0);
+                            triangles.push_back(static_cast<int>(counter ? i : i + 1));
+                            triangles.push_back(static_cast<int>(counter ? i + 1 : i));
+                        }
+                    }
 
                     // The cap's own corners: the group's weights, the cap normal, the tangent in
                     // the cap's plane.
@@ -478,6 +667,7 @@ Dismember3D::Dismember3D()
         : Node3D(),
           mRagdoll(nullptr),
           mMeshCut(false),
+          mRigid(false),
           mRadius(3.0f),
           mForce(8.0f)
 {
@@ -486,6 +676,9 @@ Dismember3D::Dismember3D()
 Dismember3D::~Dismember3D()
 {
     destroyCuts();
+    MeshStore* store = MeshStore::singleton();
+    if (store)
+        for (std::size_t i = 0; i < mPieces.size(); ++i) store->destroy(mPieces[i].mesh);
 }
 
 void Dismember3D::setRagdoll(Ragdoll3D* ragdoll)
@@ -544,6 +737,16 @@ float Dismember3D::getForce() const
     return mForce;
 }
 
+void Dismember3D::setRigid(bool rigid)
+{
+    mRigid = rigid;
+}
+
+bool Dismember3D::getRigid() const
+{
+    return mRigid;
+}
+
 bool Dismember3D::ensureActive()
 {
     if (!mRagdoll) return false;
@@ -561,7 +764,9 @@ bool Dismember3D::detach(PhysicsRagdollPart part)
     for (std::size_t i = 0; i < kParts; ++i)
         separated[i] = server->ragdollIsDetached(ragdoll, static_cast<PhysicsRagdollPart>(i));
     separated[static_cast<std::size_t>(part)] = true;
-    cutMeshes(separated);
+    if (mRigid) buildPieces();
+    else
+        cutMeshes(separated);
     return server->ragdollDetach(ragdoll, part);
 }
 
@@ -586,7 +791,9 @@ bool Dismember3D::explode(const Math::Vec3& origin)
     if (!server || !ensureActive()) return false;
     bool separated[kParts];
     for (std::size_t i = 0; i < kParts; ++i) separated[i] = true;
-    cutMeshes(separated);
+    if (mRigid) buildPieces();
+    else
+        cutMeshes(separated);
     const PhysicsRagdollId ragdoll = mRagdoll->getRagdoll();
     for (std::size_t i = 0; i < kParts; ++i)
         server->ragdollDetach(ragdoll, static_cast<PhysicsRagdollPart>(i));
@@ -644,24 +851,8 @@ MeshId Dismember3D::cutMesh(MeshId source, const ct::Vector<int>& partOfBone, co
             for (int c = 0; c < 3; ++c)
                 corners[c] = in.indices.empty() ? static_cast<std::uint32_t>(t + c)
                                                 : in.indices[t + static_cast<std::size_t>(c)];
-            int part = 0;
-            if (segments.empty()) part = dominantPart(in, corners, partOfBone);
-            else
-            {
-                const Math::Vec3 centre = (in.positions[corners[0]] + in.positions[corners[1]] +
-                                                  in.positions[corners[2]]) *
-                                          (1.0f / 3.0f);
-                float best = 3.4e38f;
-                for (std::size_t k = 0; k < segments.size(); ++k)
-                {
-                    const float d = segmentDistance2(centre, segments[k].from, segments[k].to);
-                    if (d < best)
-                    {
-                        best = d;
-                        part = segments[k].group;
-                    }
-                }
-            }
+            const int part = segments.empty() ? dominantPart(in, corners, partOfBone)
+                                              : nearestGroup(in, corners, segments);
             triGroup.push_back(part);
             for (int c = 0; c < 3; ++c)
             {
@@ -690,13 +881,12 @@ MeshId Dismember3D::cutMesh(MeshId source, const ct::Vector<int>& partOfBone, co
     return mesh;
 }
 
-void Dismember3D::cutMeshes(const bool* separated)
+bool Dismember3D::classify(const bool* separated, int* partBones, ct::Vector<int>& groupOfBone,
+        ct::Vector<DismemberSegment>& segments) const
 {
-    if (!mRagdoll) return;
-    Skeleton3D* skeleton = mRagdoll->getSkeleton();
-    if (!skeleton) return;
+    Skeleton3D* skeleton = mRagdoll ? mRagdoll->getSkeleton() : nullptr;
+    if (!skeleton) return false;
 
-    int partBones[kParts];
     for (std::size_t p = 0; p < kParts; ++p)
         partBones[p] = mRagdoll->getPartBone(static_cast<PhysicsRagdollPart>(p));
     const int boneCount = static_cast<int>(skeleton->getBoneCount());
@@ -733,7 +923,6 @@ void Dismember3D::cutMeshes(const bool* separated)
             walk = parentPart[walk];
         group[p] = separated[walk] ? walk : 0;
     }
-    ct::Vector<int> groupOfBone;
     groupOfBone.resize(partOfBone.size());
     for (std::size_t bone = 0; bone < partOfBone.size(); ++bone)
     {
@@ -798,7 +987,7 @@ void Dismember3D::cutMeshes(const bool* separated)
     // on some models bind a head to the shoulders): the group of the bone whose segment, from its
     // joint to the joint of a child, is nearest in the bind pose. The cut falls on a plane through
     // each joint; the weights only smooth the joints inside a group.
-    ct::Vector<DismemberSegment> segments;
+    segments.clear();
     {
         const Skeleton& data = skeleton->getSkeleton();
         ct::Vector<Math::Vec3> joint;
@@ -849,6 +1038,16 @@ void Dismember3D::cutMeshes(const bool* separated)
         }
         if (reach < 1e-4f) segments.clear();
     }
+    return true;
+}
+
+void Dismember3D::cutMeshes(const bool* separated)
+{
+    int partBones[kParts];
+    ct::Vector<int> groupOfBone;
+    ct::Vector<DismemberSegment> segments;
+    if (!classify(separated, partBones, groupOfBone, segments)) return;
+    Skeleton3D* skeleton = mRagdoll->getSkeleton();
 
     MeshStore* store = MeshStore::singleton();
     if (mMeshCut)
@@ -885,6 +1084,251 @@ void Dismember3D::cutMeshes(const bool* separated)
     }
 }
 
+void Dismember3D::buildPieces()
+{
+    PhysicsServer3D* server = PhysicsServer3D::singleton();
+    MeshStore* store = MeshStore::singleton();
+    Skeleton3D* skeleton = mRagdoll ? mRagdoll->getSkeleton() : nullptr;
+    if (!server || !store || !skeleton || !mPieces.empty()) return;
+    bool all[kParts];
+    for (std::size_t p = 0; p < kParts; ++p) all[p] = true;
+    int partBones[kParts];
+    ct::Vector<int> groupOfBone;
+    ct::Vector<DismemberSegment> segments;
+    if (!classify(all, partBones, groupOfBone, segments) || segments.empty()) return;
+
+    const ct::Vector<Math::Mat4>& palette = skeleton->getBonePalette();
+
+    ct::Vector<MeshInstance3D*> instances;
+    collectSkinned(skeleton, skeleton, instances);
+    for (std::size_t i = 0; i < instances.size(); ++i)
+    {
+        MeshInstance3D* instance = instances[i];
+        const MeshInfo* info = store->get(instance->getMesh());
+        if (!info || !instance->isVisible()) continue;
+        // Creating meshes may move the store's table: keep what is needed of the source.
+        const ct::String name = info->name + " (piece)";
+        ct::Vector<MaterialId> materials;
+        for (std::size_t s = 0; s < info->surfaces.size(); ++s)
+            materials.push_back(info->surfaces[s].material);
+        // Each piece is held by the bone of its part, as the skin holds the mesh, so it goes where
+        // the ragdoll takes that bone even when the bodies start from another pose than the one on
+        // screen. The pieces are cut in the frame of the pelvis, near the origin whatever the place
+        // of the body in the world, and laid in the frame of their own bone afterwards.
+        const Math::Mat4 meshToWorld = instance->getGlobalTransform();
+        Math::Mat4 partFrame[kParts];
+        for (std::size_t p = 0; p < kParts; ++p)
+            partFrame[p] = partBones[p] >= 0
+                                   ? meshToWorld * skeleton->getBoneGlobalPose(partBones[p])
+                                   : meshToWorld;
+        const Math::Mat4 toBody = partFrame[0].InverseAffine() * meshToWorld;
+        ct::Vector<PieceJoint> joints;
+        buildJoints(palette, partBones, toBody, joints);
+        MeshId pieceMesh[kParts];
+        ct::Vector<int> remap;
+        for (std::size_t s = 0; s < materials.size(); ++s)
+        {
+            const SurfaceData* source =
+                    store->surfaceSource(instance->getMesh(), static_cast<std::uint32_t>(s));
+            if (!source || source->topology != prisma::Topology::Triangles) continue;
+            const SurfaceData in = *source;
+            const std::size_t count = in.indices.empty() ? in.positions.size() : in.indices.size();
+            SurfaceData posed;
+            posed.topology = in.topology;
+            for (std::size_t v = 0; v < in.positions.size(); ++v)
+                bakeVertex(in, static_cast<std::uint32_t>(v), palette, toBody, posed);
+            ct::Vector<int> triPart;
+            ct::Vector<int> triBand;
+            for (std::size_t t = 0; t + 2 < count; t += 3)
+            {
+                std::uint32_t corners[3];
+                for (int c = 0; c < 3; ++c)
+                {
+                    corners[c] = in.indices.empty() ? static_cast<std::uint32_t>(t + c)
+                                                    : in.indices[t + static_cast<std::size_t>(c)];
+                    posed.indices.push_back(corners[c]);
+                }
+                triPart.push_back(nearestGroup(in, corners, segments));
+            }
+            for (std::size_t t = 0; t < triPart.size(); ++t)
+                triBand.push_back(bandOf(posed, t, triPart[t], joints));
+
+            for (std::size_t p = 0; p < kParts; ++p)
+            {
+                const int part = static_cast<int>(p);
+                ct::Vector<int> whole;
+                for (std::size_t t = 0; t < triPart.size(); ++t)
+                    if (triPart[t] == part && triBand[t] < 0) whole.push_back(static_cast<int>(t));
+                SurfaceData out;
+                takeTriangles(posed, whole, remap, out);
+                for (std::size_t j = 0; j < joints.size(); ++j)
+                {
+                    if (joints[j].parent != part && joints[j].child != part) continue;
+                    ct::Vector<int> band;
+                    for (std::size_t t = 0; t < triBand.size(); ++t)
+                        if (triBand[t] == static_cast<int>(j)) band.push_back(static_cast<int>(t));
+                    if (band.empty()) continue;
+                    SurfaceData strip;
+                    takeTriangles(posed, band, remap, strip);
+                    // The child keeps the side the normal points to, the parent the other.
+                    const float side = joints[j].child == part ? -1.0f : 1.0f;
+                    const Math::Vec3 normal = joints[j].normal * side;
+                    SurfaceData kept;
+                    if (sliceSurface(strip, normal, -normal.Dot(joints[j].point), kept))
+                        appendSurface(kept, out);
+                }
+                if (out.indices.empty()) continue;
+                moveSurface(out, partFrame[p].InverseAffine() * partFrame[0]);
+                if (!pieceMesh[p].valid()) pieceMesh[p] = store->create(name.c_str());
+                const MeshInfo* piece = store->get(pieceMesh[p]);
+                const std::uint32_t slot =
+                        piece ? static_cast<std::uint32_t>(piece->surfaces.size()) : 0u;
+                if (store->addSurface(pieceMesh[p], out, name.c_str()))
+                    store->setSurfaceMaterial(pieceMesh[p], slot, materials[s]);
+            }
+        }
+        for (std::size_t p = 0; p < kParts; ++p)
+        {
+            if (!pieceMesh[p].valid()) continue;
+            Piece piece;
+            piece.node = createChild<MeshInstance3D>();
+            piece.node->setMesh(pieceMesh[p]);
+            piece.node->setMaterialOverride(instance->getMaterialOverride());
+            piece.node->setCastShadows(instance->getCastShadows());
+            piece.node->setGlobalTransform(partFrame[p]);
+            piece.mesh = pieceMesh[p];
+            piece.bone = partBones[p];
+            piece.source = mHidden.size();
+            mPieces.push_back(piece);
+        }
+        instance->setVisible(false);
+        mHidden.push_back(getPathTo(instance));
+    }
+    if (!mPieces.empty()) setProcess(true);
+}
+
+void Dismember3D::buildJoints(const ct::Vector<Math::Mat4>& palette, const int* partBones,
+        const Math::Mat4& toBody, ct::Vector<PieceJoint>& joints) const
+{
+    joints.clear();
+    Skeleton3D* skeleton = mRagdoll->getSkeleton();
+    const Skeleton& data = skeleton->getSkeleton();
+    const int boneCount = static_cast<int>(skeleton->getBoneCount());
+    if (palette.size() < static_cast<std::size_t>(boneCount)) return;
+    // Where each joint is now: the palette carries the bind pose of the joint to the pose.
+    ct::Vector<Math::Vec3> point;
+    point.resize(static_cast<std::size_t>(boneCount));
+    for (int bone = 0; bone < boneCount; ++bone)
+    {
+        const Math::Vec3 rest = data.bone(static_cast<std::uint32_t>(bone))
+                                        .inverseBind.InverseAffine()
+                                        .GetTranslation();
+        point[static_cast<std::size_t>(bone)] =
+                toBody.TransformPoint(palette[static_cast<std::size_t>(bone)].TransformPoint(rest));
+    }
+    auto firstChild = [&](int bone)
+    {
+        for (int other = 0; other < boneCount; ++other)
+            if (skeleton->getBoneParent(other) == bone) return other;
+        return -1;
+    };
+
+    for (std::size_t p = 1; p < kParts; ++p)
+    {
+        const PhysicsRagdollPart part = static_cast<PhysicsRagdollPart>(p);
+        const std::size_t parent = static_cast<std::size_t>(mRagdoll->getPartParent(part));
+        int bone = partBones[p];
+        if (bone < 0 || parent >= kParts) continue;
+        // The head comes off at the base of the skull, below it the neck stays with the body.
+        if (part == PhysicsRagdollPart::Head)
+        {
+            const int skull = firstChild(bone);
+            if (skull >= 0) bone = skull;
+        }
+        const int above = skeleton->getBoneParent(bone);
+        if (above < 0) continue;
+        // The bone the part runs to: the bone of the next part down, else the bone's own child.
+        int next = -1;
+        for (std::size_t q = p + 1; q < kParts && next < 0; ++q)
+            if (static_cast<std::size_t>(
+                        mRagdoll->getPartParent(static_cast<PhysicsRagdollPart>(q))) == p &&
+                    partBones[q] >= 0)
+                next = partBones[q];
+        if (next < 0) next = firstChild(bone);
+
+        const Math::Vec3 joint = point[static_cast<std::size_t>(bone)];
+        Math::Vec3 inward = joint - point[static_cast<std::size_t>(above)];
+        const float upper = inward.Length();
+        inward = upper > 1e-5f ? inward * (1.0f / upper) : Math::Vec3(0.0f, 1.0f, 0.0f);
+        Math::Vec3 outward = inward;
+        float lower = upper;
+        if (next >= 0)
+        {
+            const Math::Vec3 run = point[static_cast<std::size_t>(next)] - joint;
+            lower = run.Length();
+            if (lower > 1e-5f) outward = run * (1.0f / lower);
+        }
+        // Across a bent joint the cut halves the bend.
+        Math::Vec3 normal = inward + outward;
+        normal = normal.Length() > 1e-4f ? normal.Normalized() : outward;
+
+        PieceJoint cut;
+        cut.point = joint;
+        cut.normal = normal;
+        cut.radius = 0.6f * (upper > lower ? upper : lower);
+        cut.band = 0.25f * cut.radius;
+        cut.parent = static_cast<int>(parent);
+        cut.child = static_cast<int>(p);
+        joints.push_back(cut);
+    }
+}
+
+void Dismember3D::placePieces()
+{
+    if (mPieces.empty()) return;
+    Skeleton3D* skeleton = mRagdoll ? mRagdoll->getSkeleton() : nullptr;
+    if (!skeleton || !mRagdoll->isActive())
+    {
+        restore();
+        return;
+    }
+    for (std::size_t i = 0; i < mPieces.size(); ++i)
+    {
+        Node* node = getNode(mHidden[mPieces[i].source]);
+        MeshInstance3D* instance = node ? node->castTo<MeshInstance3D>() : nullptr;
+        if (!instance) continue;
+        Math::Mat4 frame = instance->getGlobalTransform();
+        if (mPieces[i].bone >= 0) frame = frame * skeleton->getBoneGlobalPose(mPieces[i].bone);
+        mPieces[i].node->setGlobalTransform(frame);
+    }
+}
+
+void Dismember3D::destroyPieces()
+{
+    MeshStore* store = MeshStore::singleton();
+    for (std::size_t i = 0; i < mPieces.size(); ++i)
+    {
+        mPieces[i].node->setMesh(MeshId());
+        mPieces[i].node->queueFree();
+        if (store) store->destroy(mPieces[i].mesh);
+    }
+    mPieces.clear();
+    for (std::size_t i = 0; i < mHidden.size(); ++i)
+    {
+        Node* node = getNode(mHidden[i]);
+        MeshInstance3D* instance = node ? node->castTo<MeshInstance3D>() : nullptr;
+        if (instance) instance->setVisible(true);
+    }
+    mHidden.clear();
+    setProcess(false);
+}
+
+void Dismember3D::restore()
+{
+    restoreMeshes();
+    destroyPieces();
+}
+
 void Dismember3D::restoreMeshes()
 {
     for (std::size_t i = 0; i < mCuts.size(); ++i)
@@ -909,7 +1353,8 @@ void Dismember3D::notificationHandler(int what)
 {
     Node3D::notificationHandler(what);
     if (what == kNotificationEnterTree && !mRagdollPath.empty()) resolveRagdoll();
-    if (what == kNotificationExitTree) restoreMeshes();
+    if (what == kNotificationProcess) placePieces();
+    if (what == kNotificationExitTree) restore();
 }
 
 void Dismember3D::bindProperties()
@@ -922,6 +1367,7 @@ void Dismember3D::bindProperties()
             &P::setRadius, &P::getRadius);
     DB::addProperty<P>(PropertyInfo::range(PropertyType::Float, "force", 0.0, 1000.0, 0.01, true),
             &P::setForce, &P::getForce);
+    DB::addProperty<P>(PropertyInfo(PropertyType::Bool, "rigid"), &P::setRigid, &P::getRigid);
 }
 
 } // namespace prisma3d

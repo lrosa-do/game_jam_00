@@ -3721,6 +3721,9 @@ void bindDismemberMethods(zen::VM::ClassBuilder& builder)
     bindMethod<&Dismember3D::isDetached>(builder, "is_detached");
     bindMethod<&Dismember3D::getDetachedCount>(builder, "get_detached_count");
     bindMethod<&Dismember3D::explode>(builder, "explode");
+    bindMethod<&Dismember3D::setRigid>(builder, "set_rigid");
+    bindMethod<&Dismember3D::getRigid>(builder, "get_rigid");
+    bindMethod<&Dismember3D::restore>(builder, "restore");
 }
 
 int navigationFindPath(zen::VM* vm, zen::Value* args, int nargs)
