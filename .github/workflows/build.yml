@@ -81,15 +81,15 @@ jobs:
           EGL_PLATFORM: surfaceless
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
-          test -f win/runner.exe
+          test -f win/Release/runner.exe
           mkdir -p out/windows
-          engine/bin/export game/projecto.json -o out/windows/NULL_PROTOCOL.exe --platform windows --runner win/runner.exe --no-shader-cache
+          engine/bin/export game/projecto.json -o out/windows/NULL_PROTOCOL.exe --platform windows --runner win/Release/runner.exe --no-shader-cache
           cp game/NOTAS_DE_JOGO.md out/windows/
           (cd out/windows && zip -q -r ../NULL_PROTOCOL_windows.zip .)
       - name: Engine zips (editor, runner, export, pack)
         run: |
           (cd engine/bin && zip -q -r ../../out/prisma3d_engine_linux.zip .)
-          if [ -f win/runner.exe ]; then (cd win && zip -q -r ../out/prisma3d_engine_windows.zip .); fi
+          if [ -f win/Release/runner.exe ]; then (cd win/Release && zip -q -r ../../out/prisma3d_engine_windows.zip .); fi
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: release-${{ github.run_number }}
