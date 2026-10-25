@@ -13,7 +13,7 @@ jobs:
       - name: Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build libvulkan-dev libx11-dev libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev libxkbcommon-dev libgl-dev libasound2-dev
+          sudo apt-get install -y cmake ninja-build glslang-tools libvulkan-dev libx11-dev libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev libxkbcommon-dev libgl-dev libasound2-dev
       - name: Configure
         run: cmake -S engine -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPRISMA3D_BUILD_TESTS=OFF -DPRISMA3D_WERROR=OFF -DPRISMA3D_USE_MOLD=OFF -DPRISMA3D_USE_CCACHE=OFF
       - name: Build
@@ -29,11 +29,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Vulkan SDK
-        uses: humbug/setup-vulkan-sdk@v1.2.0
+        uses: jakoch/install-vulkan-sdk-action@v1.7.0
         with:
-          vulkan-query-version: latest
-          vulkan-components: Vulkan-Headers, Vulkan-Loader
-          vulkan-use-cache: true
+          vulkan_version: 1.3.290.0
+          cache: true
       - name: Configure
         run: cmake -S engine -B build -DCMAKE_BUILD_TYPE=Release -DPRISMA3D_BUILD_TESTS=OFF -DPRISMA3D_WERROR=OFF
       - name: Build
