@@ -3,7 +3,7 @@ import math
 # The credits, rolled at the end of the night (ending.py) and from the main menu (boot.py): a role
 # and the names under it. Edit the list to change them.
 CREDITS = [
-    ["GAME & ENGINE", ["AKADJOKER"]],
+    ["GAME & ENGINE", ["LUIS SANTOS"]],
     ["MENUS & CREDITS", ["ALEXANDRE FIGUEIREDO"]],
     ["ENGINE", ["PRISMA3D"]],
     ["MUSIC", ["MAX PAYNE 2: THE FALL OF MAX PAYNE"]],
