@@ -1,9 +1,10 @@
 import math
 
 # Closing the window or ESC opens it: the game pauses under a panel with RESUME, BACK TO MENU (the
-# night from the start, until there is a menu) and EXIT GAME. Arrows or the mouse pick, ENTER or
-# a click confirms, ESC resumes; closing the window again while it is open quits.
+# main menu, MENU_SCENE) and EXIT GAME. Arrows or the mouse pick, ENTER or a click confirms, ESC
+# resumes; closing the window again while it is open quits.
 OPTIONS = ["RESUME", "BACK TO MENU", "EXIT GAME"]
+MENU_SCENE = "Scenes/boot.scene.json"
 
 class ExitMenu(Node):
     _open = False
@@ -43,7 +44,7 @@ class ExitMenu(Node):
             self.close()
         elif index == 1:
             self.close()
-            self.get_tree().reload_current_scene()
+            self.get_tree().change_scene(MENU_SCENE, "fade", 0.6)
         else:
             self.get_tree().quit()
 

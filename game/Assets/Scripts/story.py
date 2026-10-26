@@ -99,6 +99,7 @@ class Story(Node):
     _cell_talk = False
     _meeting_said = False
     _step_time = 0.0
+    _night_time = 0.0  # real seconds from the first orders to the end, for the results
 
     def _ready(self):
         self._game = self.get_parent()
@@ -128,6 +129,8 @@ class Story(Node):
         if self._done:
             self._end = self._end + delta
             return
+        scale = time_scale()
+        self._night_time = self._night_time + (delta / scale if scale > 0.0 else delta)
         # Captain Bravura's briefing plays when she walks into the meeting room.
         if not self._meeting_said and self._player != None:
             q = self._player.global_position
@@ -345,6 +348,7 @@ class Story(Node):
         self._game.show("AI GONE WRONG // NOW GONE RIGHT", 8.0)
         self._game._glitch = 1.2
         self._game._flash = 0.3
+        self._game.ending.begin()
 
     # Card: the sergeant is the cop nearest the start; the card drops when he dies.
     def setup_card(self):

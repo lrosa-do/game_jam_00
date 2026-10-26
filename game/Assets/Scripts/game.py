@@ -119,6 +119,8 @@ class Game(Node3D):
     screamer = None
     spider = None
     exit_menu = None
+    ending = None
+    _humans_terminated = 0  # civilians killed, for the verdict of the night
     _voice = None
     _bots = None
     story = None
@@ -179,6 +181,10 @@ class Game(Node3D):
         if self.story == None:
             self.story = self.create_child("Node", "Assets/Scripts/story.py")
             self.story.name = "Story"
+        # The results and the credits once the night is over (Assets/Scripts/ending.py); made
+        # before the pause panel, which draws over it.
+        self.ending = self.create_child("Node", "Assets/Scripts/ending.py")
+        self.ending.name = "Ending"
         # Closing the window asks first (Assets/Scripts/exit_menu.py).
         self.exit_menu = self.get_node("ExitMenu")
         if self.exit_menu == None:
@@ -760,6 +766,7 @@ class Game(Node3D):
         self.noise(enemy.global_position, 10.0)
         self.kill_quip(enemy)
         if enemy.civilian:
+            self._humans_terminated = self._humans_terminated + 1
             self.show("HUMAN TERMINATED // GOOD", 2.5)
             self._glitch = 0.5
         if self.enemies != None:
