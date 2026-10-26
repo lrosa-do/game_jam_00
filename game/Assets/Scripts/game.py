@@ -545,7 +545,7 @@ class Game(Node3D):
             if d >= radius:
                 continue
             dir = self.away(center, b)
-            item.hit(b, Vec3(-dir.x, -dir.y, -dir.z), dir, damage * 2.2 * (1.0 - d / radius) + 120.0)
+            item.hit(b, Vec3(-dir.x, -dir.y, -dir.z), dir, damage * 2.2 * (1.0 - d / radius) + 120.0, source)
         for bot in self.get_tree().get_nodes_in_group("bot"):
             if bot == source:
                 continue

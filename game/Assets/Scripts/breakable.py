@@ -163,8 +163,9 @@ class Breakable(Node3D):
             fx.global_position = point
         return fx
 
-    # source: who hit it (the player passes herself, a cop itself, a blast nothing). The hack terminal
-    # has to be protected: her own hit or a blast on it is a game over; a cop's stray shot is not.
+    # source: who hit it (the player passes herself, a cop itself, a blast what blew up). The hack
+    # terminal has to be protected: her own hit or a blast she set off is a game over; a cop's stray
+    # shot or a bomb carrier's blast is not.
     def hit(self, point, normal, direction, damage, source=None):
         if self._body == None:
             self.setup()
@@ -248,6 +249,9 @@ class Breakable(Node3D):
             sound.play()
         self.free_body()
 
+    def enemy_made(self, source):
+        return source != None and (source.is_in_group("enemy") or source.is_in_group("bot") or source.is_in_group("corpse") or source.is_in_group("floater"))
+
     # A screen pops: the glass bursts out with sparks and a small bang, and the hole smokes.
     def hit_monitor(self, point, normal, source=None):
         if self._broken:
@@ -255,7 +259,9 @@ class Breakable(Node3D):
         self._broken = True
         c = self.center()
         scene = self.effects_parent()
-        if (source == None or source.is_in_group("player")) and scene != None and scene.is_in_group("game") and scene.story != None:
+        # Her shot, her kick or a blast she set off (a barrel, a car) loses the terminal; a cop's
+        # shot or a bomb carrier blowing up beside her does not.
+        if not self.enemy_made(source) and scene != None and scene.is_in_group("game") and scene.story != None:
             scene.story.terminal_broken(c)
         fx = self.spawn("Assets/Prefabs/impact.scene.json", point)
         if fx != None:
