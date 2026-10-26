@@ -82,6 +82,9 @@ class Game(Node3D):
     _score = 0
     _shown_score = 0.0
     _respawn = 0.0
+    respawn_time = 3.0
+    death_slow = 1.0  # real seconds of slow motion when she dies
+    _death = -1.0  # real seconds since she died, -1 when alive
     _feed = None
     _chain = 0
     _chain_timer = 0.0
@@ -1032,10 +1035,38 @@ class Game(Node3D):
         self._shadow_light = best
 
     def player_died(self):
-        self.show("SEGMENTATION FAULT", 3.0)
         self._glitch = 0.6
         self._chain_timer = 0.0
-        self._respawn = 3.0
+        self._respawn = self.respawn_time
+        self._death = 0.0
+        if self._player != None:
+            self._player.kill_slow(self.death_slow)
+
+    # Dead: a red flash that fades to a tint, SEGMENTATION FAULT and the rebuild at the checkpoint.
+    def draw_death(self, real, width, height):
+        if self._death < 0.0:
+            return
+        if self._respawn <= 0.0:
+            self._death = -1.0
+            return
+        self._death = self._death + real
+        t = self._death
+        s = height / 720.0
+        flash = 1.0 - math.clamp(t / 0.7, 0.0, 1.0)
+        hud_rect(0.0, 0.0, width, height, Color(0.85, 0.0, 0.02, 0.12 + 0.5 * flash))
+        fade = math.clamp(self._respawn / 0.4, 0.0, 1.0)
+        slam = 1.0 - math.clamp(t / 0.18, 0.0, 1.0)
+        title = "SEGMENTATION FAULT"
+        size = (54.0 + 30.0 * slam) * s
+        y = height * 0.3 - slam * 10.0 * s
+        self.glitch_text((width - hud_text_size(title, size).x) * 0.5, y, title, size, Color(1.0, 1.0, 1.0, fade), (3.0 + 12.0 * slam) * s)
+        line = "ENFORCEMENT UNIT DESTROYED  //  REBUILDING AT CHECKPOINT"
+        ls = 15.0 * s
+        hud_text((width - hud_text_size(line, ls).x) * 0.5, y + 72.0 * s, line, Color(1.0, 0.85, 0.85, 0.85 * fade), ls)
+        bar = 300.0 * s
+        bx = (width - bar) * 0.5
+        hud_rect(bx, y + 100.0 * s, bar, 4.0 * s, Color(1.0, 1.0, 1.0, 0.15 * fade))
+        hud_rect(bx, y + 100.0 * s, bar * (1.0 - self._respawn / self.respawn_time), 4.0 * s, Color(1.0, 0.25, 0.25, 0.9 * fade))
 
     # The quality preset: the 3D is drawn at its lines (16:9, never more than the screen has) and
     # fitted to the screen by render_aspect, with its MSAA and screen-space AA; the HUD stays
@@ -1103,6 +1134,7 @@ class Game(Node3D):
         if self.hud:
             self.draw_scan(real, width, height)
             self.draw_screen_fx(real, width, height)
+            self.draw_death(real, width, height)
             self.draw_marker(real, width, height)
             self.draw_feed(real, width, height)
             self.draw_chain(width, height)

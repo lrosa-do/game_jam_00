@@ -566,9 +566,10 @@ class Player(CharacterBody3D):
         elif self._exhausted and self._overclock >= self.overclock_max * 0.25:
             self._exhausted = False
         diving = self._dodge > 0.0 and self._dodge_time - self._dodge >= self.dive_slow_delay
-        drain = not self._exhausted and (diving or (self.captured() and mouse_check_button(MOUSE_RIGHT)))
-        want = not self._dead and (drain or self._kill_slow > 0.0)
-        self._draining = want and drain
+        drain = not self._dead and not self._exhausted and (diving or (self.captured() and mouse_check_button(MOUSE_RIGHT)))
+        # A kill or her death (game.player_died) slows time too.
+        want = drain or self._kill_slow > 0.0
+        self._draining = drain
         if want:
             if drain:
                 self._overclock = math.max(self._overclock - real, 0.0)
@@ -1096,7 +1097,7 @@ class Player(CharacterBody3D):
         low = 1.0 - self._health / self.max_health
         if low > 0.35:
             hud_image(self._img.vignette, 0.0, 0.0, width, height, 0.0, 0.0, 0.0, 1.0, 1.0, Color(0.9, 0.05, 0.05, (low - 0.35) * 1.2))
-        if self._slow:
+        if self._slow and not self._dead:
             hud_image(self._img.vignette, 0.0, 0.0, width, height, 0.0, 0.0, 0.0, 1.0, 1.0, Color(0.3, 0.7, 1.0, 0.35))
         size = 56.0 + self._kick * 26.0
         reticle_color = Color(1.0, 1.0, 1.0, 0.95)
