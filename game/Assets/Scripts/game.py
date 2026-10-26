@@ -431,12 +431,13 @@ class Game(Node3D):
         elif start != None:
             player.respawn(start.global_position, start.rotation_degrees.y)
         # The spider is rebuilt with her: the old body would be left far behind (or still waiting
-        # for its 20 s rebuild after a recall).
+        # for its 20 s rebuild after a recall). Before the night starts there is none to rebuild.
         spider = self.get_tree().get_first_node_in_group("spider")
+        had = spider != None or self._spider_rebuild >= 0.0
         if spider != None:
             spider.dismiss()
         self.spider = None
-        if not self._spider_first:
+        if had and not self._spider_first:
             self._spider_rebuild = 1.0
 
     def show(self, text, seconds):
