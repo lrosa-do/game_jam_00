@@ -415,7 +415,6 @@ class Kamikaze(CharacterBody3D):
         if self._dead:
             return
         self._dead = True
-        self.remove_from_group("bot")
         self.remove_from_group("damageable")
         if self._scream != None:
             self._scream.stop()
@@ -428,5 +427,7 @@ class Kamikaze(CharacterBody3D):
         if self._game != None:
             self._game.bot_destroyed(self)
             self._game.explode(center, self.blast_radius, self.blast_force, self.blast_damage, "big", self)
+        # Still a "bot" through its own blast, so the hack terminal knows it was not her.
+        self.remove_from_group("bot")
         self.drop_ammo()
         self.queue_free()
