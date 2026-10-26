@@ -5,7 +5,7 @@ import math
 # asked once LOADING is on screen, so the picture stays there through the load and the intro fades
 # in over it. CONTROLS and CREDITS open over the lab. Arrows, W/S or the mouse pick, ENTER or a
 # click confirms, ESC goes back (and quits from the menu).
-OPTIONS = ["START", "CONTROLS", "CREDITS", "QUIT"]
+MENU_OPTIONS = ["START", "CONTROLS", "CREDITS", "QUIT"]
 CONTROLS = [
     ["W A S D", "MOVE"],
     ["MOUSE", "AIM"],
@@ -135,16 +135,16 @@ class Boot(Node):
         row = 46.0 * s
         if self._start < 0.0 and alpha >= 1.0:
             self.menu_input(x, y, row, s)
-        for i in range(len(OPTIONS)):
+        for i in range(len(MENU_OPTIONS)):
             top = y + row * i
             if i == self._choice:
                 pulse = 0.75 + 0.25 * math.sin(self._clock * 6.0)
                 hud_rect(x - 16.0 * s, top + 4.0 * s, 330.0 * s, row - 8.0 * s, Color(0.35, 0.8, 1.0, 0.16 * alpha))
                 hud_rect(x - 16.0 * s, top + 4.0 * s, 4.0 * s, row - 8.0 * s, Color(1.0, 0.2, 0.25, 0.95 * alpha))
-                color = Color(1.0, 0.35, 0.35, pulse * alpha) if OPTIONS[i] == "QUIT" else Color(1.0, 1.0, 1.0, pulse * alpha)
-                glitch_text(x, top + 9.0 * s, "> " + OPTIONS[i], 26.0 * s, color, 1.2 * s)
+                color = Color(1.0, 0.35, 0.35, pulse * alpha) if MENU_OPTIONS[i] == "QUIT" else Color(1.0, 1.0, 1.0, pulse * alpha)
+                glitch_text(x, top + 9.0 * s, "> " + MENU_OPTIONS[i], 26.0 * s, color, 1.2 * s)
             else:
-                hud_text(x, top + 9.0 * s, "  " + OPTIONS[i], Color(0.45, 0.9, 1.0, 0.6 * alpha), 26.0 * s)
+                hud_text(x, top + 9.0 * s, "  " + MENU_OPTIONS[i], Color(0.45, 0.9, 1.0, 0.6 * alpha), 26.0 * s)
         dim = Color(1.0, 1.0, 1.0, 0.45 * alpha)
         hud_text(x, height - 44.0 * s, "[ENTER] SELECT    [ESC] QUIT", dim, 13.0 * s)
         mark = 84.0 * s
@@ -160,7 +160,7 @@ class Boot(Node):
             return
         mouse = mouse_position()
         moved = mouse_delta()
-        for i in range(len(OPTIONS)):
+        for i in range(len(MENU_OPTIONS)):
             top = y + row * i
             if mouse.x >= x - 16.0 * s and mouse.x <= x + 314.0 * s and mouse.y >= top and mouse.y < top + row:
                 if (moved.x != 0.0 or moved.y != 0.0) and i != self._choice:
@@ -170,9 +170,9 @@ class Boot(Node):
                     self.pick(i)
                     return
         if keyboard_check_pressed(KEY_UP) or keyboard_check_pressed(KEY_W):
-            self.select((self._choice + len(OPTIONS) - 1) % len(OPTIONS))
+            self.select((self._choice + len(MENU_OPTIONS) - 1) % len(MENU_OPTIONS))
         elif keyboard_check_pressed(KEY_DOWN) or keyboard_check_pressed(KEY_S):
-            self.select((self._choice + 1) % len(OPTIONS))
+            self.select((self._choice + 1) % len(MENU_OPTIONS))
         elif keyboard_check_pressed(KEY_ENTER) or keyboard_check_pressed(KEY_KP_ENTER) or keyboard_check_pressed(KEY_SPACE):
             self.pick(self._choice)
         elif keyboard_check_pressed(KEY_ESCAPE):

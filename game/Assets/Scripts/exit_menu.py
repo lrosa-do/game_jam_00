@@ -3,7 +3,7 @@ import math
 # Closing the window or ESC opens it: the game pauses under a panel with RESUME, BACK TO MENU (the
 # main menu, MENU_SCENE) and EXIT GAME. Arrows or the mouse pick, ENTER or a click confirms, ESC
 # resumes; closing the window again while it is open quits.
-OPTIONS = ["RESUME", "BACK TO MENU", "EXIT GAME"]
+PAUSE_OPTIONS = ["RESUME", "BACK TO MENU", "EXIT GAME"]
 MENU_SCENE = "Scenes/boot.scene.json"
 
 class ExitMenu(Node):
@@ -62,15 +62,15 @@ class ExitMenu(Node):
             self.close()
             return
         if keyboard_check_pressed(KEY_UP) or keyboard_check_pressed(KEY_W):
-            self._choice = (self._choice + len(OPTIONS) - 1) % len(OPTIONS)
+            self._choice = (self._choice + len(PAUSE_OPTIONS) - 1) % len(PAUSE_OPTIONS)
         if keyboard_check_pressed(KEY_DOWN) or keyboard_check_pressed(KEY_S):
-            self._choice = (self._choice + 1) % len(OPTIONS)
+            self._choice = (self._choice + 1) % len(PAUSE_OPTIONS)
         width = hud_width()
         height = hud_height()
         s = height / 720.0
         w = 420.0 * s
         row = 46.0 * s
-        h = 92.0 * s + row * len(OPTIONS)
+        h = 92.0 * s + row * len(PAUSE_OPTIONS)
         x = (width - w) * 0.5
         y = (height - h) * 0.5
         mouse = mouse_position()
@@ -83,14 +83,14 @@ class ExitMenu(Node):
         title = "TERMINATE SESSION?"
         hud_text(x + 18.0 * s, y + 34.0 * s, title, Color(1.0, 1.0, 1.0, 1.0), 24.0 * s)
         oy = y + 80.0 * s
-        for i in range(len(OPTIONS)):
+        for i in range(len(PAUSE_OPTIONS)):
             over = mouse.x >= x and mouse.x <= x + w and mouse.y >= oy and mouse.y < oy + row
             if over:
                 self._choice = i
                 if clicked:
                     self.pick(i)
                     return
-            text = OPTIONS[i]
+            text = PAUSE_OPTIONS[i]
             if i == self._choice:
                 pulse = 0.75 + 0.25 * math.sin(self._clock * 6.0)
                 hud_rect(x + 10.0 * s, oy + 4.0 * s, w - 20.0 * s, row - 8.0 * s, Color(0.35, 0.8, 1.0, 0.18))
