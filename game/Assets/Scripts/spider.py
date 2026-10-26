@@ -414,6 +414,16 @@ class Spider(CharacterBody3D):
         self._game.spider_lost()
         self.queue_free()
 
+    # She was rebuilt at a checkpoint (game.place_player): this body goes without a trace and a new
+    # one is built at her side.
+    def dismiss(self):
+        self._wrecked = True
+        if self._fx != None:
+            self._fx.body = None
+            self._fx = None
+        self.remove_from_group("spider")
+        self.queue_free()
+
     # Caught in a blast: the body is lost, the core goes back to the android (game.spider_lost).
     def wreck(self):
         if self._wrecked:

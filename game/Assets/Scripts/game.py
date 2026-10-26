@@ -430,6 +430,14 @@ class Game(Node3D):
             player.respawn(checkpoint, self.story.checkpoint_yaw)
         elif start != None:
             player.respawn(start.global_position, start.rotation_degrees.y)
+        # The spider is rebuilt with her: the old body would be left far behind (or still waiting
+        # for its 20 s rebuild after a recall).
+        spider = self.get_tree().get_first_node_in_group("spider")
+        if spider != None:
+            spider.dismiss()
+        self.spider = None
+        if not self._spider_first:
+            self._spider_rebuild = 1.0
 
     def show(self, text, seconds):
         self._message = text
