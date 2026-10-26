@@ -21,7 +21,7 @@ SPEED = 50.0  # pixels a second at 720 lines
 # What the game is built with, rolled after the names: the logos in Assets/Textures/Logos with
 # their width over their height.
 BUILT_WITH = [["Assets/Textures/Logos/prisma3d.png", 869.0 / 231.0], ["Assets/Textures/Logos/prisma.png", 724.0 / 214.0], ["Assets/Textures/Logos/kinetix.png", 774.0 / 187.0]]
-BUILT_HEIGHT = 72.0  # each logo, pixels at 720 lines
+BUILT_HEIGHT = 52.0  # each logo, pixels at 720 lines
 
 class Credits(Node):
     _logo = -1
@@ -95,8 +95,8 @@ class Credits(Node):
 
     # The card shown when leaving the game (outro.py): MADE WITH and the logos, centred on (cx, cy).
     def made_with(self, cx, cy, s, alpha):
-        h = 80.0 * s
-        gap = 30.0 * s
+        h = 56.0 * s
+        gap = 22.0 * s
         y = cy - (34.0 * s + len(BUILT_WITH) * (h + gap) - gap) * 0.5
         size = 16.0 * s
         hud_text(cx - hud_text_size("MADE WITH", size).x * 0.5, y, "MADE WITH", Color(1.0, 0.3, 0.3, 0.9 * alpha), size)
