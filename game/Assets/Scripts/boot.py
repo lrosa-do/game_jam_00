@@ -38,6 +38,7 @@ class Boot(Node):
     _lab = -1
     _ctw = -1
     _credits = None
+    _outro = None
     _music = None
     _snd_move = None
     _snd_pick = None
@@ -155,6 +156,8 @@ class Boot(Node):
 
     # The mouse picks the option it moves over (a mouse at rest leaves the arrows alone).
     def menu_input(self, x, y, row, s):
+        if self._outro != None:
+            return
         mouse = mouse_position()
         moved = mouse_delta()
         for i in range(len(OPTIONS)):
@@ -173,7 +176,7 @@ class Boot(Node):
         elif keyboard_check_pressed(KEY_ENTER) or keyboard_check_pressed(KEY_KP_ENTER) or keyboard_check_pressed(KEY_SPACE):
             self.pick(self._choice)
         elif keyboard_check_pressed(KEY_ESCAPE):
-            self.get_tree().quit()
+            self.leave()
 
     def select(self, index):
         self._choice = index
@@ -185,11 +188,17 @@ class Boot(Node):
             self._start = 0.0
             mouse_set_mode(MOUSE_MODE_HIDDEN)
         elif index == 3:
-            self.get_tree().quit()
+            self.leave()
         else:
             self._page = index
             if index == 2:
                 self._credits.restart()
+
+    # QUIT: the MADE WITH card, then the game closes (Assets/Scripts/outro.py).
+    def leave(self):
+        if self._outro == None:
+            self._outro = self.create_child("Node", "Assets/Scripts/outro.py")
+            self._outro.name = "Outro"
 
     # A page closes with ESC, ENTER or a click.
     def back_input(self):

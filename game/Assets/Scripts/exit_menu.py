@@ -12,6 +12,7 @@ class ExitMenu(Node):
     _mouse_mode = 0
     _clock = 0.0
     _fresh = False
+    _outro = None
 
     def _ready(self):
         # Runs while the tree is paused, the rest of the game does not.
@@ -45,11 +46,13 @@ class ExitMenu(Node):
         elif index == 1:
             self.close()
             self.get_tree().change_scene(MENU_SCENE, "fade", 0.6)
-        else:
-            self.get_tree().quit()
+        elif self._outro == None:
+            # EXIT GAME: the MADE WITH card, then the game closes (Assets/Scripts/outro.py).
+            self._outro = self.create_child("Node", "Assets/Scripts/outro.py")
+            self._outro.name = "Outro"
 
     def _process(self, delta):
-        if not self._open:
+        if not self._open or self._outro != None:
             return
         self._clock = self._clock + delta
         # The ESC that opened it is still down this frame.

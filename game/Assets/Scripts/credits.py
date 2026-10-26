@@ -7,7 +7,6 @@ CREDITS = [
     ["GAME", ["GONCALO RIBEIRO", "ALEXANDRE FIGUEIREDO"]],
     ["MENUS & CREDITS", ["ALEXANDRE FIGUEIREDO"]],
     ["GAME TESTERS", ["GONCALO FERNANDES", "RONALD ABRANTES"]],
-    ["ENGINE", ["PRISMA3D"]],
     ["MUSIC", ["MAX PAYNE 2: THE FALL OF MAX PAYNE"]],
     ["VOICES", ["KOKORO TTS"]],
     ["CHARACTERS", ["MESHY"]],
@@ -19,10 +18,15 @@ CREDITS = [
 LOGO_UV = [0.2344, 0.0, 0.7632, 0.9330]
 LOGO_ASPECT = 1.0068
 SPEED = 50.0  # pixels a second at 720 lines
+# What the game is built with, rolled after the names: the logos in Assets/Textures/Logos with
+# their width over their height.
+BUILT_WITH = [["Assets/Textures/Logos/prisma3d.png", 869.0 / 231.0], ["Assets/Textures/Logos/prisma.png", 724.0 / 214.0], ["Assets/Textures/Logos/kinetix.png", 774.0 / 187.0]]
+BUILT_HEIGHT = 72.0  # each logo, pixels at 720 lines
 
 class Credits(Node):
     _logo = -1
     _ctw = -1
+    _built = None
     _t = 0.0
     _height = 720.0
     _s = 1.0
@@ -30,6 +34,9 @@ class Credits(Node):
     def _ready(self):
         self._logo = hud_load_image("Assets/Textures/Menu/logo.png")
         self._ctw = hud_load_image("Assets/Textures/Logos/ctw.png")
+        self._built = []
+        for entry in BUILT_WITH:
+            self._built.append(hud_load_image(entry[0]))
 
     def restart(self):
         self._t = 0.0
@@ -49,6 +56,7 @@ class Credits(Node):
         top = 250.0 * s + 100.0 * s
         for entry in CREDITS:
             top = top + 24.0 * s + 34.0 * s * len(entry[1]) + 36.0 * s
+        top = top + self.built_height(s)
         # The CTW mark comes in alone: the names have left the screen when it stops.
         last = top + 300.0 * s
         card = 156.0 * s
@@ -65,11 +73,38 @@ class Credits(Node):
                 self.line(cx, ly, name, 24.0 * s, Color(1.0, 1.0, 1.0, alpha))
                 ly = ly + 34.0 * s
             ly = ly + 36.0 * s
+        self.built(cx, ly, s, alpha)
         ly = y + last
         mark = 110.0 * s
         hud_image(self._ctw, cx - mark * 0.5, ly, mark, mark, 0.0, 0.0, 0.0, 1.0, 1.0, Color(1.0, 1.0, 1.0, alpha * self.edge(ly + mark * 0.5)))
         self.line(cx, ly + mark + 14.0 * s, "THANK YOU FOR PLAYING", 24.0 * s, Color(1.0, 1.0, 1.0, alpha))
         return y <= stop
+
+    def built_height(self, s):
+        return 24.0 * s + len(BUILT_WITH) * (BUILT_HEIGHT + 26.0) * s + 36.0 * s
+
+    # BUILT WITH and the logos of the engine, the renderer and the physics, one under the other.
+    def built(self, cx, y, s, alpha):
+        self.line(cx, y, "BUILT WITH", 14.0 * s, Color(1.0, 0.3, 0.3, 0.9 * alpha))
+        y = y + 30.0 * s
+        h = BUILT_HEIGHT * s
+        for i in range(len(BUILT_WITH)):
+            w = h * BUILT_WITH[i][1]
+            hud_image(self._built[i], cx - w * 0.5, y, w, h, 0.0, 0.0, 0.0, 1.0, 1.0, Color(1.0, 1.0, 1.0, alpha * self.edge(y + h * 0.5)))
+            y = y + h + 26.0 * s
+
+    # The card shown when leaving the game (outro.py): MADE WITH and the logos, centred on (cx, cy).
+    def made_with(self, cx, cy, s, alpha):
+        h = 80.0 * s
+        gap = 30.0 * s
+        y = cy - (34.0 * s + len(BUILT_WITH) * (h + gap) - gap) * 0.5
+        size = 16.0 * s
+        hud_text(cx - hud_text_size("MADE WITH", size).x * 0.5, y, "MADE WITH", Color(1.0, 0.3, 0.3, 0.9 * alpha), size)
+        y = y + 34.0 * s
+        for i in range(len(BUILT_WITH)):
+            w = h * BUILT_WITH[i][1]
+            hud_image(self._built[i], cx - w * 0.5, y, w, h, 0.0, 0.0, 0.0, 1.0, 1.0, Color(1.0, 1.0, 1.0, alpha))
+            y = y + h + gap
 
     # Near the top or the bottom of the screen the roll fades out.
     def edge(self, y):
