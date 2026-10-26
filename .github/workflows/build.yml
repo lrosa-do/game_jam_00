@@ -74,7 +74,7 @@ jobs:
         run: |
           mkdir -p out/game
           engine/bin/export game/projecto.json -o out/game/NULL_PROTOCOL --platform linux --runner engine/bin/runner --no-shader-cache
-          cp game/NOTAS_DE_JOGO.md out/game/
+          cp -r trailer out/game/
       - name: Export Windows
         continue-on-error: true
         env:
