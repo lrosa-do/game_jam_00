@@ -11,7 +11,7 @@ CREDITS = [
     ["VOICES", ["KOKORO TTS"]],
     ["CHARACTERS", ["MESHY"]],
     ["ANIMATION", ["MIXAMO", "MAX PAYNE 2"]],
-    ["TOOLS", ["BLENDER"]],
+    ["TOOLS", ["DEFORM", "COCOSHAPE"]],
 ]
 # Where the logo is in Assets/Textures/Menu/logo.png (1672x941, the rest is clear), as a fraction
 # of the picture, and its width over its height.
