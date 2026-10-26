@@ -4,6 +4,7 @@ import math
 # and the names under it. Edit the list to change them.
 CREDITS = [
     ["GAME & ENGINE", ["LUIS SANTOS"]],
+    ["GAME", ["GONCALO RIBEIRO"]],
     ["MENUS & CREDITS", ["ALEXANDRE FIGUEIREDO"]],
     ["ENGINE", ["PRISMA3D"]],
     ["MUSIC", ["MAX PAYNE 2: THE FALL OF MAX PAYNE"]],
