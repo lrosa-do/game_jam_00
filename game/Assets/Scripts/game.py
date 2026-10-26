@@ -161,6 +161,9 @@ class Game(Node3D):
     _minimap = None
     _director = None  # NULL//OS as a presence (Assets/Scripts/nullos.py)
     _path_at = -1.0
+    floater_every = 2  # cops killed for each floater NULL//OS builds
+    floater_max = 3
+    _cop_kills = 0
 
     def _ready(self):
         self._player = self.get_node("Player")
@@ -250,6 +253,26 @@ class Game(Node3D):
             spider._fx = fx
             spider.materialize(1000.0)
         return spider
+
+    # A floater built in the air at position (Assets/Prefabs/floater_spawn.scene.json: stars fall
+    # in, an orb swells and bursts, the floater grows out of it). No more than floater_max at once.
+    def spawn_floater(self, position):
+        if len(self.get_tree().get_nodes_in_group("floater")) >= self.floater_max:
+            return None
+        floater = self.instantiate("Assets/Prefabs/floater.scene.json")
+        if floater == None:
+            return None
+        floater.global_position = position
+        floater.add_to_group("floater")
+        floater.materialize(1000.0)
+        self._total = self._total + 1
+        fx = self.instantiate("Assets/Prefabs/floater_spawn.scene.json")
+        if fx != None:
+            fx.global_position = position
+            fx.body = floater
+        else:
+            floater.appear()
+        return floater
 
     # The build effect on the floor under a body (Assets/Prefabs/materialize.scene.json).
     def materialize_fx(self, position, body, height, radius):
@@ -774,8 +797,14 @@ class Game(Node3D):
             if math.abs(e.y - position.y) < 6.0 and (e.x - position.x) * (e.x - position.x) + (e.z - position.z) * (e.z - position.z) < reach * reach:
                 bot.hear(position)
 
-    def enemy_killed(self, enemy):
+    def enemy_killed(self, enemy, cop=True):
         self.noise(enemy.global_position, 10.0)
+        # Every floater_every cops she kills, NULL//OS builds a floater where the last one fell.
+        if cop and not enemy.civilian:
+            self._cop_kills = self._cop_kills + 1
+            if self._cop_kills % self.floater_every == 0:
+                e = enemy.global_position
+                self.spawn_floater(Vec3(e.x, e.y + 1.6, e.z))
         self.kill_quip(enemy)
         if enemy.civilian:
             self._humans_terminated = self._humans_terminated + 1

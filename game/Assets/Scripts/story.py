@@ -83,6 +83,7 @@ class Story(Node):
     _count = 0
     _needed = 0
     _items = None
+    _car_floater = False
     _wave = 0.0
     _waves_left = 0
     _spawned = None
@@ -509,6 +510,13 @@ class Story(Node):
 
     def update_training(self, delta):
         player = self._player
+        # NULL//OS answers the test: the first floater is built out of the wreck, whichever step
+        # of the calibration she blew the car on.
+        car = self._items[0] if self._items != None and len(self._items) > 0 else None
+        if car != None and car._broken and not self._car_floater:
+            self._car_floater = True
+            c = car.center()
+            self._game.spawn_floater(Vec3(c.x, c.y + 1.8, c.z))
         # ENTER skips the calibration (not the ENTER that closes the orders: they are still
         # closing on that frame).
         if self._step < len(TRAINING) and not self._game.briefing() and keyboard_check_pressed(KEY_ENTER):

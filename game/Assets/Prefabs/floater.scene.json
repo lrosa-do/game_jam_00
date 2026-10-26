@@ -2,15 +2,27 @@
   "format": "prisma3d-scene",
   "version": 1,
   "root": {
-    "class": "Node3D",
+    "class": "CharacterBody3D",
     "name": "Floater",
     "groups": [
       "floater"
     ],
     "properties": {
-      "script": "Assets/Scripts/floater.py"
+      "script": "Assets/Scripts/floater.py",
+      "radius": 0.45,
+      "height": 1.2,
+      "collision_mask": 3
     },
     "children": [
+      {
+        "class": "CollisionShape3D",
+        "name": "Shape",
+        "properties": {
+          "shape_type": 3,
+          "capsule_radius": 0.45,
+          "capsule_height": 1.5
+        }
+      },
       {
         "instance": "Assets/Models/Floater/floater.glb",
         "name": "Model",

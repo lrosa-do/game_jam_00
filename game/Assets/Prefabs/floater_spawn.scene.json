@@ -1,0 +1,159 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "Node3D",
+    "name": "Orb",
+    "properties": {
+      "script": "Assets/Scripts/orb.py"
+    },
+    "children": [
+      {
+        "class": "ParticleSystem3D",
+        "name": "Stars",
+        "properties": {
+          "texture": "Assets/Textures/Fx/soft.png",
+          "blend_mode": 1,
+          "align": 0,
+          "max_particles": 200,
+          "emission_mode": 0,
+          "emission_rate": 0.0,
+          "drag": 0.0,
+          "particle_lifetime_min": 0.45,
+          "particle_lifetime_max": 0.45,
+          "particle_speed_min": 0.0,
+          "particle_speed_max": 0.0,
+          "particle_size_start": [
+            0.07,
+            0.07
+          ],
+          "particle_size_end": [
+            0.02,
+            0.02
+          ],
+          "particle_color_start": [
+            1.0,
+            0.35,
+            0.25,
+            0.0
+          ],
+          "particle_color_end": [
+            1.0,
+            0.8,
+            0.7,
+            1.0
+          ],
+          "particle_rotation_speed_min": 0.0,
+          "particle_rotation_speed_max": 0.0
+        }
+      },
+      {
+        "class": "ParticleSystem3D",
+        "name": "Sparks",
+        "properties": {
+          "texture": "Assets/Textures/Fx/soft.png",
+          "blend_mode": 1,
+          "align": 1,
+          "max_particles": 48,
+          "emission_mode": 0,
+          "emission_rate": 0.0,
+          "emission_direction": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "emission_spread_angle": 180.0,
+          "gravity": [
+            0,
+            -3.0,
+            0
+          ],
+          "drag": 1.2,
+          "shape_type": 1,
+          "shape_radius": 0.2,
+          "emission_offset": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "particle_lifetime_min": 0.3,
+          "particle_lifetime_max": 0.7,
+          "particle_speed_min": 2.5,
+          "particle_speed_max": 6.0,
+          "scale_velocity_enabled": true,
+          "scale_velocity_min": 0.0,
+          "scale_velocity_max": 6.0,
+          "scale_velocity_at_min": [
+            0.4,
+            0.4
+          ],
+          "scale_velocity_at_max": [
+            0.4,
+            2.5
+          ],
+          "particle_size_start": [
+            0.06,
+            0.06
+          ],
+          "particle_size_end": [
+            0.02,
+            0.02
+          ],
+          "particle_color_start": [
+            1.0,
+            0.55,
+            0.4,
+            1.0
+          ],
+          "particle_color_end": [
+            1.0,
+            0.1,
+            0.05,
+            0.0
+          ]
+        }
+      },
+      {
+        "class": "MeshInstance3D",
+        "name": "Orb",
+        "properties": {
+          "mesh": "primitive:sphere?radius=1&rings=12&slices=18",
+          "material_override": "Assets/Materials/floater_fx.mat::orb",
+          "transparency": 0.5,
+          "cast_shadow": false
+        }
+      },
+      {
+        "class": "OmniLight3D",
+        "name": "Light",
+        "properties": {
+          "position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "light_color": [
+            1.0,
+            0.3,
+            0.2,
+            1.0
+          ],
+          "light_energy": 0.0,
+          "omni_range": 5.0,
+          "shadow_enabled": false
+        }
+      },
+      {
+        "class": "AudioStreamPlayer3D",
+        "name": "Sound",
+        "properties": {
+          "stream": "Assets/Sounds/fx/scan_on.ogg",
+          "attenuation_model": 1,
+          "max_distance": 40.0,
+          "unit_size": 6.0,
+          "volume_linear": 1.0
+        }
+      }
+    ]
+  }
+}

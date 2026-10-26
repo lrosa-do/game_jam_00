@@ -1,0 +1,45 @@
+{
+  "format": "prisma3d-scene",
+  "version": 1,
+  "root": {
+    "class": "Node3D",
+    "name": "Bolt",
+    "properties": {
+      "script": "Assets/Scripts/bolt.py"
+    },
+    "children": [
+      {
+        "class": "MeshInstance3D",
+        "name": "Core",
+        "properties": {
+          "mesh": "primitive:sphere?radius=0.07&rings=8&slices=12",
+          "material_override": "Assets/Materials/floater_fx.mat::orb",
+          "cast_shadow": false
+        }
+      },
+      {
+        "class": "OmniLight3D",
+        "name": "Light",
+        "properties": {
+          "light_color": [
+            1.0,
+            0.25,
+            0.15,
+            1.0
+          ],
+          "light_energy": 2.5,
+          "omni_range": 3.5,
+          "shadow_enabled": false
+        }
+      },
+      {
+        "class": "RibbonTrail3D",
+        "name": "Trail",
+        "properties": {
+          "max_elements": 16,
+          "trail_length": 0.25
+        }
+      }
+    ]
+  }
+}
