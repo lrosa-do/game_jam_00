@@ -66,15 +66,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libvulkan1 mesa-vulkan-drivers libx11-6 libxi6 libxcursor1 libxrandr2 libxinerama1 libxkbcommon0 libgl1 libegl1 libegl-mesa0 libgl1-mesa-dri libgbm1 zip
           chmod +x engine/bin/*
+      # One pack for both: the Linux and the Windows runner read the same data.rpak next to them.
       - name: Export Linux
         env:
           EGL_PLATFORM: surfaceless
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
-          mkdir -p out/linux
-          engine/bin/export game/projecto.json -o out/linux/NULL_PROTOCOL --platform linux --runner engine/bin/runner --no-shader-cache
-          cp game/NOTAS_DE_JOGO.md out/linux/
-          (cd out/linux && zip -q -r ../NULL_PROTOCOL_linux.zip .)
+          mkdir -p out/game
+          engine/bin/export game/projecto.json -o out/game/NULL_PROTOCOL --platform linux --runner engine/bin/runner --no-shader-cache
+          cp game/NOTAS_DE_JOGO.md out/game/
       - name: Export Windows
         continue-on-error: true
         env:
@@ -84,8 +84,10 @@ jobs:
           test -f win/Release/runner.exe
           mkdir -p out/windows
           engine/bin/export game/projecto.json -o out/windows/NULL_PROTOCOL.exe --platform windows --runner win/Release/runner.exe --no-shader-cache
-          cp game/NOTAS_DE_JOGO.md out/windows/
-          (cd out/windows && zip -q -r ../NULL_PROTOCOL_windows.zip .)
+          rm out/windows/data.rpak
+          cp out/windows/* out/game/
+      - name: Game zip
+        run: (cd out/game && zip -q -r ../NULL_PROTOCOL.zip .)
       - name: Engine zips (editor, runner, export, pack)
         run: |
           (cd engine/bin && zip -q -r ../../out/prisma3d_engine_linux.zip .)
