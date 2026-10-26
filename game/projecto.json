@@ -12,7 +12,7 @@
     "Scenes/map_view.scene.json",
     "Scenes/cut_test.scene.json"
   ],
-  "activeScene": "Scenes/game.scene.json",
+  "activeScene": "Scenes/boot.scene.json",
   "searchPaths": [],
   "settings": {
     "display/window/size/mode": 3,
